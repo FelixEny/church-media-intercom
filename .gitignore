@@ -1,0 +1,26 @@
+# Gradle / Android
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing material must never be committed
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log
+
+# Python dev tooling (tools/loadclient)
+__pycache__/
+*.pyc
+.venv/
+venv/

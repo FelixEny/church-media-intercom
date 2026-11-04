@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Comms</string>
+    <string name="session_notification_channel">Live session</string>
+    <string name="session_notification_title">Comms session active</string>
+</resources>
