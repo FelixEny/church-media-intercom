@@ -24,3 +24,6 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Node dev tooling (tools/loadclient)
+node_modules/

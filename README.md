@@ -5,8 +5,10 @@ phone hosts the session; team members join over the existing Wi-Fi and talk over
 direct WebRTC audio. No cloud, no accounts, no subscription.
 
 > **Status: early development (0.1.0).**
-> The project currently builds and installs, but the audio pipeline is still being
-> wired up. See [docs/ROADMAP.md](docs/ROADMAP.md) for what works today.
+> The director can host on a phone, members can join and sync the roster, and the
+> floor/mic flow works over the local network. The WebRTC media path has been
+> verified at the signalling level and still needs a two-phone test — see
+> [docs/spike-results.md](docs/spike-results.md).
 
 ## Why this exists
 
@@ -65,6 +67,18 @@ Requires JDK 17 and an Android SDK with `platforms;android-37.0` and
 | [docs/PROTOCOL.md](docs/PROTOCOL.md) | Signalling message reference |
 | [docs/TESTING.md](docs/TESTING.md) | Device matrix, latency method, known gaps |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Phases and current status |
+| [docs/spike-results.md](docs/spike-results.md) | What has been verified on hardware |
+
+## Signalling probe (dev only)
+
+There is a Node probe for testing the host without a second phone:
+
+```powershell
+cd tools/loadclient
+npm install
+adb forward tcp:47811 tcp:47811
+node probe.js --host 127.0.0.1 --code 4821
+```
 
 ## Licence
 
