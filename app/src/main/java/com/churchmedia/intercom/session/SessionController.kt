@@ -167,7 +167,11 @@ class SessionController(
             callbacks = object : MemberSession.Callbacks {
                 override fun onLink(state: LinkState, detail: String?) {
                     _state.update {
-                        it.copy(link = state, connecting = state == LinkState.CONNECTING)
+                        it.copy(
+                            link = state,
+                            connecting = state == LinkState.CONNECTING,
+                            linkDetail = if (state == LinkState.CONNECTED) null else detail,
+                        )
                     }
                 }
 
@@ -177,7 +181,13 @@ class SessionController(
 
                 override fun onWelcome(hostName: String, myId: String) {
                     _state.update {
-                        it.copy(hostName = hostName, myId = myId, link = LinkState.CONNECTED, connecting = false)
+                        it.copy(
+                            hostName = hostName,
+                            myId = myId,
+                            link = LinkState.CONNECTED,
+                            connecting = false,
+                            linkDetail = null,
+                        )
                     }
                     refreshProcessing()
                 }

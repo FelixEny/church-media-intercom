@@ -25,9 +25,7 @@ class SignalingClient(
     private val onState: (LinkState, String?) -> Unit,
 ) {
     private val client = HttpClient(OkHttp) {
-        install(WebSockets) {
-            maxFrameSize = 512L * 1024L
-        }
+        install(WebSockets)
     }
 
     @Volatile

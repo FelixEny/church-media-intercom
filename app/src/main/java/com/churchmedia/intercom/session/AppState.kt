@@ -12,6 +12,7 @@ import com.churchmedia.intercom.core.model.Role
 data class AppState(
     val mode: Mode = Mode.IDLE,
     val link: LinkState = LinkState.IDLE,
+    val linkDetail: String? = null,
     val connecting: Boolean = false,
     val sessionCode: String = "",
     val hostName: String = "",

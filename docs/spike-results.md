@@ -55,6 +55,35 @@ involved.
 - The settings screen initially showed two identically-labelled "Pixel 8 Pro"
   outputs (speaker and earpiece). Fixed by suffixing the device kind.
 
+### Bugs found and fixed while testing the member path (0.1.1)
+
+Both of these made the member hang forever on "Connecting" with no explanation —
+the exact symptom reported from the second phone.
+
+1. **Cleartext WebSocket blocked.** `ws://` is cleartext HTTP and Android blocks
+   it by default since API 28. The client died before sending anything, so the
+   host saw zero connections. Fixed with `android:usesCleartextTraffic="true"`
+   (signalling only; media remains DTLS-SRTP encrypted).
+2. **`maxFrameSize` is unsupported by the Ktor OkHttp engine.** Setting it threw
+   `Max frame size switch is not supported in OkHttp engine` during connect.
+   Removed; the default frame limit is far above our ~1.2 KB SDP frames.
+
+The member screen now shows the address it is dialling and the raw failure
+reason in amber, which is how both bugs were identified in one pass.
+
+### Member path verified (stub host)
+
+Using `tools/loadclient/minihost.js` plus `adb reverse` on a single phone:
+
+| Check | Outcome |
+|---|---|
+| Member connects and sends `hello` | ✅ `code=1111 name=Test` received by the stub |
+| Member UI shows Connected + host name | ✅ "Stub Director · Connected" |
+| Mic button enabled, floor actions sent | ✅ |
+
+Still outstanding for the real two-phone test: audio in both directions, latency,
+NS effect, echo, reconnect.
+
 ## Next measurements to record
 
 1. One-way mouth-to-ear latency, p50/p95, wired headset and speaker.

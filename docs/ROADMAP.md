@@ -12,6 +12,7 @@ Status as of the first vertical slice. See
 | Signalling protocol + JSON codec | ✅ |
 | WebSocket server/client on LAN | ✅ |
 | Director hosts, member joins, roster syncs | ✅ |
+| Member join path (WebSocket + handshake) | ✅ verified against a stub host (0.1.1) |
 | 1:1 WebRTC audio (media path) | 🚧 signalling and SDP verified; audio needs a second phone |
 | Noise-suppression toggle verified on device | 🚧 UI + runtime API wired; effect not yet measured |
 | Latency measurement recorded | ⬜ |

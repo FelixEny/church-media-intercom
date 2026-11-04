@@ -40,7 +40,6 @@ class SignalingServer(
         if (isRunning) return
         val engine = embeddedServer(CIO, port = port) {
             install(WebSockets) {
-                maxFrameSize = 512L * 1024L
                 masking = false
             }
             routing {

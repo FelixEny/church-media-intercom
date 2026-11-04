@@ -85,6 +85,18 @@ fun MemberScreen(
         }
         FloorBanner(banner.first, banner.second)
 
+        if (state.link != LinkState.CONNECTED) {
+            VerticalSpacer(10)
+            Text(
+                text = buildString {
+                    append("Trying ${state.hostAddress}:${state.port}")
+                    state.linkDetail?.let { append(" · $it") }
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (state.linkDetail != null) CommsColors.Warning else CommsColors.TextSecondary,
+            )
+        }
+
         Spacer(Modifier.weight(1f))
 
         BigMicButton(
