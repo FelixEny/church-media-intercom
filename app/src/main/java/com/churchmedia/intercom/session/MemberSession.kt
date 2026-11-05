@@ -26,6 +26,7 @@ class MemberSession(
         fun onLink(state: LinkState, detail: String?)
         fun onRoster(members: List<Member>, floor: FloorState)
         fun onWelcome(hostName: String, myId: String)
+        fun onRemoteLevel(level: Float)
         fun onNotice(message: String)
         fun onEnded(reason: String)
     }
@@ -41,6 +42,7 @@ class MemberSession(
             client.send(ClientMessage.Ice(mid = mid, mLine = mLine, candidate = candidate))
         },
         onPeerState = { detail -> callbacks.onNotice(detail) },
+        onRemoteLevel = { level -> callbacks.onRemoteLevel(level) },
     )
 
     private val client = SignalingClient(

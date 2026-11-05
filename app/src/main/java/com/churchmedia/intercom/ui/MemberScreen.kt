@@ -23,6 +23,7 @@ import com.churchmedia.intercom.core.model.LinkState
 import com.churchmedia.intercom.session.AppState
 import com.churchmedia.intercom.ui.components.BigMicButton
 import com.churchmedia.intercom.ui.components.FloorBanner
+import com.churchmedia.intercom.ui.components.LevelMeter
 import com.churchmedia.intercom.ui.components.SectionCard
 import com.churchmedia.intercom.ui.components.StatusPill
 import com.churchmedia.intercom.ui.components.Tone
@@ -84,6 +85,13 @@ fun MemberScreen(
             else -> "The channel is quiet" to Tone.Neutral
         }
         FloorBanner(banner.first, banner.second)
+
+        if (connected || state.micLevel > 0f) {
+            VerticalSpacer(12)
+            LevelMeter("Incoming", state.remoteLevel)
+            VerticalSpacer(6)
+            LevelMeter("Mic", state.micLevel)
+        }
 
         if (state.link != LinkState.CONNECTED) {
             VerticalSpacer(10)

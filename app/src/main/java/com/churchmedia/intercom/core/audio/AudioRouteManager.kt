@@ -22,10 +22,38 @@ class AudioRouteManager(context: Context) {
     fun enterCommunicationMode() {
         runCatching {
             audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                audioManager.isSpeakerphoneOn = false
-            }
+            applyBestRoute()
         }
+    }
+
+    /**
+     * Android never picks a sensible output for voice communication on its own: with no
+     * headset attached it routes to the earpiece, which is inaudible in a room. Ask for
+     * a wired/USB/Bluetooth device if one is connected, otherwise the loudspeaker.
+     *
+     * @return the id of the device now in use, or null when the platform kept its default.
+     */
+    fun applyBestRoute(): Int? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val infos = audioManager.availableCommunicationDevices
+            val preferred = infos.firstOrNull { info ->
+                info.kind() in setOf(
+                    OutputDevice.Kind.WIRED,
+                    OutputDevice.Kind.USB,
+                    OutputDevice.Kind.BLUETOOTH,
+                )
+            } ?: infos.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+
+            if (preferred != null) {
+                val ok = runCatching { audioManager.setCommunicationDevice(preferred) }.getOrDefault(false)
+                if (ok) return preferred.id
+            }
+            return audioManager.communicationDevice?.id
+        }
+
+        @Suppress("DEPRECATION")
+        audioManager.isSpeakerphoneOn = true
+        return null
     }
 
     fun exitCommunicationMode() {
@@ -61,7 +89,9 @@ class AudioRouteManager(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             audioManager.communicationDevice?.id
         } else {
-            audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).firstOrNull()?.id
+            // Pre-31 there is no communication device to query, and guessing would show
+            // the wrong radio button in Settings.
+            null
         }
     }.getOrNull()
 

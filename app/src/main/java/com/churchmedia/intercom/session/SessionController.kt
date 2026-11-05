@@ -43,6 +43,9 @@ class SessionController(
     private var member: MemberSession? = null
 
     init {
+        core.onMicLevel = { level ->
+            _state.update { it.copy(micLevel = level) }
+        }
         scope.launch {
             val settings = settingsStore.current()
             _state.update {
@@ -210,6 +213,10 @@ class SessionController(
                         )
                     }
                     refreshProcessing()
+                }
+
+                override fun onRemoteLevel(level: Float) {
+                    _state.update { it.copy(remoteLevel = level) }
                 }
 
                 override fun onNotice(message: String) {

@@ -20,6 +20,10 @@ data class AppState(
     val localAddress: String = "",
     val port: Int = DEFAULT_PORT,
     val myId: String = "",
+    /** 0..1 level of audio arriving from the director; only meaningful in member mode. */
+    val remoteLevel: Float = 0f,
+    /** 0..1 level of this phone's own microphone. */
+    val micLevel: Float = 0f,
     val members: List<Member> = emptyList(),
     val floor: FloorState = FloorState.Free,
     val recipients: Set<String> = emptySet(),

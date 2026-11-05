@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -197,13 +198,50 @@ fun Divider(modifier: Modifier = Modifier) {
 @Composable
 fun RowSpacer(width: Int = 8) = Spacer(Modifier.width(width.dp))
 
+/**
+ * Live level meter for captured or decoded audio.
+ *
+ * It exists because "I can't hear anything" is otherwise untestable: the two meters
+ * separate "nothing is being sent", "my mic is not capturing" and "it is arriving but
+ * routed somewhere inaudible".
+ */
+@Composable
+fun LevelMeter(label: String, level: Float, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = CommsColors.TextSecondary,
+            modifier = Modifier.width(64.dp),
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(CommsColors.SurfaceHigh),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(level.coerceIn(0f, 1f))
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(CommsColors.Accent),
+            )
+        }
+    }
+}
+
 @Composable
 fun VerticalSpacer(height: Int = 8) = Spacer(Modifier.height(height.dp))
 
 /** Used by both dashboards so the "who is talking" line looks identical. */
 @Composable
-fun FloorBanner(text: String, tone: Tone) {
-    val (fg, bg) = when (tone) {
+fun FloorBanner(text: String, tone: Tone) {    val (fg, bg) = when (tone) {
         Tone.Live -> CommsColors.Live to CommsColors.LiveDeep
         Tone.Accent -> CommsColors.Accent to CommsColors.AccentDeep
         Tone.Warning -> CommsColors.Warning to Color(0xFF2E2314)

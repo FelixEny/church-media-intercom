@@ -1,6 +1,8 @@
 package com.churchmedia.intercom.core.audio
 
+import java.nio.ByteBuffer
 import org.webrtc.AudioTrack
+import org.webrtc.AudioTrackSink
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.MediaStreamTrack
@@ -20,6 +22,7 @@ class MemberAudioEngine(
     private val onAnswer: (sdp: String) -> Unit,
     private val onIce: (mid: String?, mLine: Int, candidate: String) -> Unit,
     private val onPeerState: (detail: String) -> Unit,
+    private val onRemoteLevel: (Float) -> Unit,
 ) {
     private val lock = Any()
 
@@ -27,12 +30,16 @@ class MemberAudioEngine(
     private var localTrack: AudioTrack? = null
     private var sender: RtpSender? = null
     private var remoteTrack: AudioTrack? = null
+    private var sink: AudioTrackSink? = null
 
     @Volatile
     private var micLive: Boolean = false
 
     @Volatile
     private var volume: Float = 1f
+
+    @Volatile
+    private var lastLevelAt: Long = 0L
 
     /** Creates the peer connection eagerly so the answer can be produced instantly. */
     fun prepare() {
@@ -46,7 +53,7 @@ class MemberAudioEngine(
                         if (track != null) {
                             track.setEnabled(true)
                             track.setVolume(volume.toDouble())
-                            synchronized(lock) { remoteTrack = track }
+                            attachLevelSink(track)
                         }
                     },
                     onState = { state -> onPeerState(state.name) },
@@ -112,6 +119,7 @@ class MemberAudioEngine(
 
     fun close() {
         synchronized(lock) {
+            runCatching { remoteTrack?.removeSink(sink) }
             runCatching { pc?.close() }
             runCatching { pc?.dispose() }
             runCatching { localTrack?.dispose() }
@@ -119,7 +127,52 @@ class MemberAudioEngine(
             localTrack = null
             sender = null
             remoteTrack = null
+            sink = null
         }
+    }
+
+    /**
+     * Feeds decoded inbound audio to the UI.
+     *
+     * This is the only way to answer "is the director's voice actually arriving?" without
+     * a human in the room: the meter moves only when frames are decoded and played.
+     */
+    private fun attachLevelSink(track: AudioTrack) {
+        val levelSink = object : AudioTrackSink {
+            override fun onData(
+                data: ByteBuffer?,
+                audioFormat: Int,
+                sampleRate: Int,
+                numberOfFrames: Int,
+                numberOfChannels: Int,
+                timeStampNs: Long,
+            ) {
+                val buffer = data ?: return
+                val now = System.currentTimeMillis()
+                if (now - lastLevelAt < 120) return
+                lastLevelAt = now
+                onRemoteLevel(incomingLevel(buffer))
+            }
+        }
+
+        synchronized(lock) {
+            runCatching { remoteTrack?.removeSink(sink) }
+            runCatching { track.addSink(levelSink) }
+            remoteTrack = track
+            sink = levelSink
+        }
+    }
+
+    /**
+     * Peak level of a decoded buffer, 0..1.
+     *
+     * See [AudioLevels.pcm16] for why PCM16 interpretation is used for any format.
+     */
+    private fun incomingLevel(buffer: ByteBuffer): Float {
+        val view = buffer.duplicate()
+        val bytes = ByteArray(view.remaining())
+        view.get(bytes)
+        return AudioLevels.pcm16(bytes)
     }
 
     private fun applyMicState() {

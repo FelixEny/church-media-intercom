@@ -34,6 +34,7 @@ import com.churchmedia.intercom.core.model.Member
 import com.churchmedia.intercom.session.AppState
 import com.churchmedia.intercom.ui.components.BigMicButton
 import com.churchmedia.intercom.ui.components.FloorBanner
+import com.churchmedia.intercom.ui.components.LevelMeter
 import com.churchmedia.intercom.ui.components.StatusPill
 import com.churchmedia.intercom.ui.components.Tone
 import com.churchmedia.intercom.ui.components.VerticalSpacer
@@ -86,6 +87,9 @@ fun DirectorScreen(
             else -> "Nobody is talking" to Tone.Neutral
         }
         FloorBanner(banner.first, banner.second)
+
+        VerticalSpacer(10)
+        LevelMeter("Mic", state.micLevel)
 
         VerticalSpacer(18)
 

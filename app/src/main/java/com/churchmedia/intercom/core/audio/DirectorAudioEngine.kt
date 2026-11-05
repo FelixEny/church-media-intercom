@@ -35,6 +35,14 @@ class DirectorAudioEngine(
     @Volatile
     private var recipients: Set<String> = emptySet()
 
+    /**
+     * The dashboard defaults to "everyone". Without this flag the engine would start
+     * with an empty recipient set and silently encode to nobody while the UI showed
+     * every member ticked.
+     */
+    @Volatile
+    private var everyone: Boolean = true
+
     @Volatile
     private var micLive: Boolean = false
 
@@ -63,7 +71,7 @@ class DirectorAudioEngine(
         val sender = pc.addTrack(track, listOf("intercom"))
 
         val link = Link(memberId = memberId, pc = pc, track = track, sender = sender)
-        link.selected = recipients.contains(memberId)
+        link.selected = everyone || recipients.contains(memberId)
         link.micLive = micLive
         links[memberId] = link
 
@@ -103,10 +111,11 @@ class DirectorAudioEngine(
 
     /** Recipient selection from the dashboard. [everyone] overrides the explicit set. */
     fun setRecipients(selected: Set<String>, everyone: Boolean) {
+        this.everyone = everyone
         recipients = if (everyone) links.keys.toSet() else selected
         synchronized(lock) {
             links.values.forEach {
-                it.selected = recipients.contains(it.memberId)
+                it.selected = everyone || recipients.contains(it.memberId)
                 applyRouting(it)
             }
         }

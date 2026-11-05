@@ -25,6 +25,13 @@ class WebRtcCore(private val context: Context) {
     private var adm: JavaAudioDeviceModule? = null
     private var source: AudioSource? = null
 
+    /** Level of the captured microphone, 0..1. Throttled by this class. */
+    @Volatile
+    var onMicLevel: ((Float) -> Unit)? = null
+
+    @Volatile
+    private var lastMicLevelAt: Long = 0L
+
     /** True when the platform reports a hardware noise suppressor we can toggle live. */
     var hardwareNoiseSuppressionSupported: Boolean = false
         private set
@@ -49,6 +56,16 @@ class WebRtcCore(private val context: Context) {
                 .setUseHardwareNoiseSuppressor(false)
                 .setUseLowLatency(true)
                 .setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
+                .setSamplesReadyCallback(
+                    object : JavaAudioDeviceModule.SamplesReadyCallback {
+                        override fun onWebRtcAudioRecordSamplesReady(samples: JavaAudioDeviceModule.AudioSamples) {
+                            val now = System.currentTimeMillis()
+                            if (now - lastMicLevelAt < 120) return
+                            lastMicLevelAt = now
+                            onMicLevel?.invoke(AudioLevels.pcm16(samples.data))
+                        }
+                    },
+                )
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
