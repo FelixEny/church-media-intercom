@@ -18,6 +18,21 @@ members; that is simulated with the load client until more phones are available.
 ./gradlew :app:connectedDebugAndroidTest # ADM/NS toggle, service lifecycle
 ```
 
+## Diagnose before you blame the network
+
+Both dashboards show level meters. Use them first — they cut "I can't hear anything"
+down to one cause in a single glance:
+
+| Mic meter | Incoming meter | Meaning |
+|---|---|---|
+| flat | flat | nothing is being sent — check the mic tap and recipient selection |
+| moving | flat | capture works, the other side is not receiving — routing/recipient bug |
+| flat | moving | the other side is fine, **this** phone's mic is not capturing |
+| moving | moving | audio is arriving; if you still hear nothing it is output routing |
+
+Check the chosen output on **Audio settings** as well: Android defaults voice
+communication to the earpiece, which is inaudible away from the ear.
+
 ## Latency measurement (two phones)
 
 Mouth-to-ear, not a ping.

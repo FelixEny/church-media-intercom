@@ -17,6 +17,24 @@ from `192.168.0.25` over a different Wi-Fi (`MTN5G_402B71 5.0Ghz`, 5 GHz, no int
 | Audible audio both directions | ⬜ needs a human in the room |
 | Latency, NS effect, echo | ⬜ |
 
+### Second round: why nothing was heard (0.1.3)
+
+Reported as "speaking on the host, member hears nothing; the reverse works".
+Two independent causes, both found and fixed:
+
+1. **The director encoded to nobody.** `DirectorAudioEngine` started with an empty
+   recipient set while the dashboard showed *Everyone* ticked, so the mic was
+   encoded to zero members. Members were marked unselected on join. The engine now
+   carries an explicit `everyone` flag so UI and engine cannot disagree.
+2. **No output device was ever chosen.** `MODE_IN_COMMUNICATION` was set without
+   `setCommunicationDevice()`, so Android routed voice to the **earpiece** — nearly
+   inaudible at arm's length. It now prefers wired/USB/Bluetooth, else the loudspeaker.
+
+To stop this class of bug being a guessing game, the dashboards now show two level
+meters: **Mic** (own capture, via `SamplesReadyCallback`) and **Incoming** (decoded
+remote audio, via `AudioTrackSink`). They separate "not sending" from "not capturing"
+from "arriving but inaudible". `docs/TESTING.md` should use them first.
+
 ### Root cause of the "Connecting forever" failure: Local Network Protection
 
 Android 17 enforces **Local Network Protection**: an app without

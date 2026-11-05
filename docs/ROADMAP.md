@@ -38,6 +38,7 @@ Status as of the first vertical slice. See
 - [x] Noise suppression toggle + effective-state display
 - [x] Incoming volume (per-remote-track gain, 20–200 %)
 - [x] Output device selection (speaker / earpiece / USB-C / BT-SCO)
+- [x] Automatic route: wired/USB/BT if attached, otherwise loudspeaker
 - [ ] Software APM noise-suppression toggle (capture restart) if hardware NS is absent
 - [ ] Microphone test meter
 - [ ] Limiter for >100 % boost
