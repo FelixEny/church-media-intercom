@@ -9,6 +9,7 @@ import com.churchmedia.intercom.core.model.LinkState
 import com.churchmedia.intercom.core.model.Member
 import com.churchmedia.intercom.core.model.Mode
 import com.churchmedia.intercom.core.net.LanNetwork
+import com.churchmedia.intercom.core.net.LanNetworkBinder
 import com.churchmedia.intercom.data.SettingsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +31,7 @@ class SessionController(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val core = WebRtcCore(context)
     private val audioRoute = AudioRouteManager(context)
+    private val lanBinder = LanNetworkBinder(context)
 
     private val _state = MutableStateFlow(AppState())
     val state: StateFlow<AppState> = _state.asStateFlow()
@@ -60,6 +62,15 @@ class SessionController(
     fun startDirector(name: String, port: Int = DEFAULT_PORT) {
         if (_state.value.mode != Mode.IDLE) return
         val cleanName = name.trim().ifBlank { "Director" }
+
+        // Must happen before any socket is created: see LanNetworkBinder.
+        val wifi = lanBinder.bindToWifi()
+        if (wifi == null) {
+            _state.update {
+                it.copy(error = "Connect to Wi-Fi first. This app never uses mobile data.")
+            }
+            return
+        }
 
         _state.update {
             it.copy(
@@ -141,6 +152,15 @@ class SessionController(
             return
         }
 
+        // Bind before the WebSocket is created: see LanNetworkBinder.
+        val wifi = lanBinder.bindToWifi()
+        if (wifi == null) {
+            _state.update {
+                it.copy(error = "Connect to Wi-Fi first. This app never uses mobile data.")
+            }
+            return
+        }
+
         _state.update {
             it.copy(
                 mode = Mode.MEMBER,
@@ -218,6 +238,7 @@ class SessionController(
         director = null
         member = null
         runCatching { audioRoute.exitCommunicationMode() }
+        runCatching { lanBinder.unbind() }
         SessionService.stop(context)
 
         _state.update { current ->

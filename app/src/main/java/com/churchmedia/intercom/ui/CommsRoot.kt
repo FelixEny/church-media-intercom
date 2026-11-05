@@ -56,7 +56,13 @@ fun CommsRoot(controller: SessionController) {
         if (result.values.all { it }) {
             action?.invoke()
         } else {
-            controller.reportError("Microphone access is required to join a session")
+            val denied = requiredPermissions()
+                .filter { result[it] == false }
+                .joinToString(", ") { it.substringAfterLast('.') }
+            controller.reportError(
+                "Comms needs these permissions to run a session: $denied. " +
+                    "Local network access is what lets two phones talk on the same Wi-Fi.",
+            )
         }
     }
 
@@ -201,5 +207,9 @@ private fun requiredPermissions(): List<String> = buildList {
     }
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         add(Manifest.permission.BLUETOOTH_CONNECT)
+    }
+    // Android 16+ (API 36 preview, enforced on 37) gates all local-network traffic.
+    if (Build.VERSION.SDK_INT >= 37) {
+        add(Manifest.permission.ACCESS_LOCAL_NETWORK)
     }
 }

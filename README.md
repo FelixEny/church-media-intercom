@@ -41,6 +41,8 @@ enough, and nothing needs to reach the internet.
 ## Requirements
 
 - Android 8.0 (API 26) or newer, `arm64-v8a` or `armeabi-v7a`
+- Android 16+ asks for **local network access** — it is mandatory; without it the
+  OS silently drops every LAN packet
 - All devices on the same Wi-Fi network, with **AP/client isolation disabled**
 - Wired (USB-C) earbuds recommended for the director; Bluetooth works but adds latency
 

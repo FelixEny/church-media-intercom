@@ -3,6 +3,41 @@
 Living log of what has actually been proven on hardware, as opposed to what is
 implemented. Update this file whenever a claim is verified or disproven.
 
+## 2026-11-05 — two-phone session established (0.1.2)
+
+Second phone hosted (`192.168.0.231`, session 9359); Pixel 8 Pro joined as a member
+from `192.168.0.25` over a different Wi-Fi (`MTN5G_402B71 5.0Ghz`, 5 GHz, no internet).
+
+| Check | Outcome |
+|---|---|
+| Member → host WebSocket | ✅ ESTABLISHED |
+| Handshake, roster, SDP | ✅ member shows host name + session code |
+| WebRTC peer connection | ✅ `PeerConnectionState = CONNECTED` (ICE + DTLS complete) |
+| Member mic button, floor messages | ✅ |
+| Audible audio both directions | ⬜ needs a human in the room |
+| Latency, NS effect, echo | ⬜ |
+
+### Root cause of the "Connecting forever" failure: Local Network Protection
+
+Android 17 enforces **Local Network Protection**: an app without
+`ACCESS_LOCAL_NETWORK` has its LAN traffic **silently dropped**. The symptom is
+brutal — TCP sits in `SYN-SENT` forever, no RST, no ICMP, no exception — while
+`adb shell ping`/`nc` to the same host works, because shell is exempt.
+
+```
+appops get com.churchmedia.intercom.debug
+  ACCESS_LOCAL_NETWORK: ignore          ← default, before the fix
+```
+
+Fix: declare `android.permission.ACCESS_LOCAL_NETWORK`, request it with the other
+runtime permissions on API 37+, and bind the process to the Wi-Fi network
+(`LanNetworkBinder`) so sockets do not fall back to mobile data on an
+internet-less LAN. After the grant the same socket went to `ESTAB`.
+
+Consequence for every future LAN feature (mDNS discovery, QR join, UDP beacon):
+they all need this permission, and it must be granted **before** the first socket
+is created.
+
 ## 2026-11-04 — first vertical slice, Pixel 8 Pro (Android 17 / API 37)
 
 **Build:** `app-arm64-v8a-debug.apk` (AGP 9.5.0, Gradle 9.8.2, Kotlin 2.4.21,

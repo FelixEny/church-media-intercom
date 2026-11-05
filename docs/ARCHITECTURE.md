@@ -117,8 +117,24 @@ state reported by the SDK rather than trusting the switch position.
 - Signalling runs on `Dispatchers.IO`.
 - Compose collects state with `collectAsStateWithLifecycle()`.
 
-## Failure handling
+## Android 16+ Local Network Protection (critical)
 
+On API 37 the OS refuses LAN traffic from an app that has not been granted
+`ACCESS_LOCAL_NETWORK`. The failure is silent: sockets stay in `SYN-SENT`, no
+`ConnectException`, no ICMP — nothing to catch. `adb shell` is exempt, so shell
+probes always succeed and can mislead debugging.
+
+Therefore, in this order, before any socket exists:
+
+1. `ACCESS_LOCAL_NETWORK` is granted (requested alongside microphone access).
+2. `LanNetworkBinder.bindToWifi()` binds the process to the Wi-Fi `Network`, so
+   traffic does not fall back to mobile data when the LAN has no internet.
+3. Only then is the signalling server started or the WebSocket client created.
+
+`endSession()` unbinds. Anything added later that touches the LAN (mDNS, UDP
+beacon, QR join) must run behind the same gate.
+
+## Failure handling
 | Failure | Behaviour |
 |---|---|
 | Wi-Fi blip, WebSocket drops | client retries with backoff, re-sends `hello`; host rebuilds that member's peer connection |
