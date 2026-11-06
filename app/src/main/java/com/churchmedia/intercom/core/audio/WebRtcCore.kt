@@ -36,6 +36,10 @@ class WebRtcCore(private val context: Context) {
     var hardwareNoiseSuppressionSupported: Boolean = false
         private set
 
+    /** Effective software NS state (only meaningful when hardware NS is unavailable). */
+    @Volatile
+    private var softwareNoiseSuppression: Boolean = true
+
     fun ensureInitialized() {
         synchronized(lock) {
             if (factory != null) return
@@ -114,7 +118,26 @@ class WebRtcCore(private val context: Context) {
      */
     fun setNoiseSuppression(enabled: Boolean): Boolean {
         val module = adm ?: return false
-        return runCatching { module.setNoiseSuppressorEnabled(enabled) }.getOrDefault(false)
+        // Hardware path: live toggle, no glitch.
+        if (hardwareNoiseSuppressionSupported) {
+            return runCatching { module.setNoiseSuppressorEnabled(enabled) }.getOrDefault(false)
+        }
+        // Software path: restart capture with the requested APM configuration.
+        // requestStartRecording/requestStopRecording are the SDK's supported runtime
+        // control for the Audio Processing Module; if they are not viable with an
+        // active PeerConnection the call fails and the UI reports it.
+        return runCatching {
+            module.requestStopRecording()
+            val options = org.webrtc.audio.AudioProcessingOptions(
+                org.webrtc.audio.AudioProcessingComponentOptions(true),                 // AEC
+                org.webrtc.audio.AudioProcessingComponentOptions(enabled),              // NS
+                org.webrtc.audio.AudioProcessingComponentOptions(true),                 // AGC
+                org.webrtc.audio.AudioProcessingComponentOptions(true),                 // HPF
+            )
+            val ok = module.requestStartRecording(options)
+            if (ok) softwareNoiseSuppression = enabled
+            ok
+        }.getOrDefault(false)
     }
 
     /** Human-readable summary of what the platform really enabled. */
@@ -128,7 +151,13 @@ class WebRtcCore(private val context: Context) {
                 append("AEC: ")
                 append(if (aec.isActive == true) "hardware" else "WebRTC software")
                 append(" · NS: ")
-                append(if (ns.isActive == true) "hardware" else "WebRTC software")
+                if (ns.isActive == true) {
+                    append("hardware")
+                } else if (hardwareNoiseSuppressionSupported) {
+                    append("off (hardware)")
+                } else {
+                    append(if (softwareNoiseSuppression) "WebRTC software" else "off")
+                }
             }
         }.getOrDefault("Unknown")
     }

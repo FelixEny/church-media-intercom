@@ -9,46 +9,57 @@ import com.churchmedia.intercom.core.model.FloorState
  */
 class FloorController {
 
-    var current: FloorState = FloorState.Free
-        private set
+    private val lock = Any()
 
-    fun request(memberId: String): Decision = when (val holder = current) {
-        FloorState.Free -> {
-            current = FloorState.Member(memberId)
-            Decision.Granted
+    @Volatile
+    private var _current: FloorState = FloorState.Free
+
+    var current: FloorState
+        get() = synchronized(lock) { _current }
+        private set(value) {
+            synchronized(lock) { _current = value }
         }
-        FloorState.Director -> Decision.DirectorTalking
-        is FloorState.Member -> if (holder.id == memberId) Decision.Granted else Decision.Busy
+
+    fun request(memberId: String): Decision = synchronized(lock) {
+        when (val holder = _current) {
+            FloorState.Free -> {
+                _current = FloorState.Member(memberId)
+                Decision.Granted
+            }
+            FloorState.Director -> Decision.DirectorTalking
+            is FloorState.Member -> if (holder.id == memberId) Decision.Granted else Decision.Busy
+        }
     }
 
-    fun release(memberId: String): Boolean {
-        val holder = current
+    fun release(memberId: String): Boolean = synchronized(lock) {
+        val holder = _current
         if (holder is FloorState.Member && holder.id == memberId) {
-            current = FloorState.Free
-            return true
+            _current = FloorState.Free
+            true
+        } else {
+            false
         }
-        return false
     }
 
     /** Director presses the mic. Pre-empts any member, by design. */
-    fun directorTake(): FloorState {
-        current = FloorState.Director
-        return current
+    fun directorTake(): FloorState = synchronized(lock) {
+        _current = FloorState.Director
+        _current
     }
 
-    fun directorRelease(): FloorState {
-        if (current is FloorState.Director) current = FloorState.Free
-        return current
+    fun directorRelease(): FloorState = synchronized(lock) {
+        if (_current is FloorState.Director) _current = FloorState.Free
+        _current
     }
 
     /** A member left or dropped; never leave the floor stuck. */
-    fun memberLeft(memberId: String) {
-        val holder = current
-        if (holder is FloorState.Member && holder.id == memberId) current = FloorState.Free
+    fun memberLeft(memberId: String) = synchronized(lock) {
+        val holder = _current
+        if (holder is FloorState.Member && holder.id == memberId) _current = FloorState.Free
     }
 
-    fun reset() {
-        current = FloorState.Free
+    fun reset() = synchronized(lock) {
+        _current = FloorState.Free
     }
 
     sealed interface Decision {

@@ -37,11 +37,14 @@ open class PeerObserver(
     private val onIce: (IceCandidate) -> Unit,
     private val onRemoteTrack: (RtpTransceiver) -> Unit,
     private val onState: (PeerConnection.PeerConnectionState) -> Unit,
+    private val onIceConnectionChange: (PeerConnection.IceConnectionState) -> Unit = {},
 ) : PeerConnection.Observer {
 
     override fun onSignalingChange(newState: PeerConnection.SignalingState?) = Unit
 
-    override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState?) = Unit
+    override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState?) {
+        newState?.let(onIceConnectionChange)
+    }
 
     override fun onIceConnectionReceivingChange(receiving: Boolean) = Unit
 

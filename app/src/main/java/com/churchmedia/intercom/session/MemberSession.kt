@@ -81,6 +81,10 @@ class MemberSession(
                 myId = message.youId
                 members = message.members.map { it.toModel() }
                 floor = message.floor.toModel()
+                // Rebuild the peer connection for a new host connection instead of
+                // reusing a stale one.
+                engine.reset()
+                engine.prepare()
                 callbacks.onWelcome(message.hostName, message.youId)
                 callbacks.onRoster(members, floor)
                 applyFloor()

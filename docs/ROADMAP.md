@@ -27,11 +27,12 @@ Status as of the first vertical slice. See
 
 ## Phase 2 — Star audio
 
-- [x] Director N-peer engine with per-recipient `Encoding.active`
-- [x] Floor control end to end (host authoritative, member mirrors)
-- [x] Director and member dashboards, roster status
-- [ ] Reconnect + ICE restart verified on hardware
-- [ ] Per-member connection quality indicator
+- [x] ICE candidate queueing and offer/answer sequencing
+- [x] ICE failure recovery via PeerConnection restart
+- [x] RTP parameter failure handling
+- [x] FloorController concurrency (synchronized)
+- [x] Reconnection resets the member PeerConnection
+- [x] Software noise-suppression toggle path (AudioProcessingOptions)
 
 ## Phase 3 — Audio settings
 

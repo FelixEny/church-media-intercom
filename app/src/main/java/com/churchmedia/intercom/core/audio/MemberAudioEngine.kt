@@ -1,6 +1,12 @@
 package com.churchmedia.intercom.core.audio
 
 import java.nio.ByteBuffer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.webrtc.AudioTrack
 import org.webrtc.AudioTrackSink
 import org.webrtc.IceCandidate
@@ -16,6 +22,9 @@ import org.webrtc.SessionDescription
  *
  * The microphone track is created up front but attached to the transceiver created
  * by the director's offer, so the SDP never grows a second audio section.
+ *
+ * ICE candidates that arrive before the remote description is set are queued and
+ * drained afterwards; the answer is only sent once setLocalDescription succeeds.
  */
 class MemberAudioEngine(
     private val core: WebRtcCore,
@@ -24,6 +33,7 @@ class MemberAudioEngine(
     private val onPeerState: (detail: String) -> Unit,
     private val onRemoteLevel: (Float) -> Unit,
 ) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val lock = Any()
 
     private var pc: PeerConnection? = null
@@ -37,6 +47,14 @@ class MemberAudioEngine(
 
     @Volatile
     private var volume: Float = 1f
+
+    @Volatile
+    private var remoteDescriptionSet: Boolean = false
+
+    @Volatile
+    private var iceRestarting: Boolean = false
+
+    private val pendingIce = mutableListOf<IceCandidate>()
 
     @Volatile
     private var lastLevelAt: Long = 0L
@@ -57,6 +75,13 @@ class MemberAudioEngine(
                         }
                     },
                     onState = { state -> onPeerState(state.name) },
+                    onIceConnectionChange = { state ->
+                        if (state == PeerConnection.IceConnectionState.FAILED ||
+                            state == PeerConnection.IceConnectionState.DISCONNECTED
+                        ) {
+                            scheduleIceRecovery(state)
+                        }
+                    },
                 ) {},
             )
             pc = connection
@@ -71,6 +96,16 @@ class MemberAudioEngine(
         connection.setRemoteDescription(
             SdpAdapter(
                 onSetSuccess = {
+                    synchronized(lock) {
+                        remoteDescriptionSet = true
+                        pendingIce.forEach { queued ->
+                            if (!connection.addIceCandidate(queued)) {
+                                onPeerState("Queued ICE candidate rejected")
+                            }
+                        }
+                        pendingIce.clear()
+                    }
+
                     val audio = connection.transceivers.firstOrNull {
                         it.mediaType == MediaStreamTrack.MediaType.MEDIA_TYPE_AUDIO
                     }
@@ -87,15 +122,20 @@ class MemberAudioEngine(
                     connection.createAnswer(
                         SdpAdapter(
                             onCreateSuccess = { answer ->
-                                connection.setLocalDescription(SdpAdapter(), answer)
-                                onAnswer(answer.description)
+                                connection.setLocalDescription(
+                                    SdpAdapter(
+                                        onSetSuccess = { onAnswer(answer.description) },
+                                        onFailure = { error -> onPeerState("setLocalDescription failed: $error") },
+                                    ),
+                                    answer,
+                                )
                             },
                             onFailure = { error -> onPeerState("answer failed: $error") },
                         ),
                         MediaConstraints(),
                     )
                 },
-                onFailure = { error -> onPeerState("offer failed: $error") },
+                onFailure = { error -> onPeerState("remote description failed: $error") },
             ),
             SessionDescription(SessionDescription.Type.OFFER, sdp),
         )
@@ -103,7 +143,15 @@ class MemberAudioEngine(
 
     fun handleIce(mid: String?, mLine: Int, candidate: String) {
         val connection = pc ?: return
-        runCatching { connection.addIceCandidate(IceCandidate(mid ?: "", mLine, candidate)) }
+        val ice = IceCandidate(mid ?: "", mLine, candidate)
+        synchronized(lock) {
+            if (!remoteDescriptionSet) {
+                pendingIce.add(ice)
+                return
+            }
+        }
+        val ok = connection.addIceCandidate(ice)
+        if (!ok) onPeerState("ICE candidate rejected")
     }
 
     /** Member only transmits while it holds the floor. */
@@ -128,7 +176,20 @@ class MemberAudioEngine(
             sender = null
             remoteTrack = null
             sink = null
+            remoteDescriptionSet = false
+            pendingIce.clear()
+            micLive = false
+            iceRestarting = false
         }
+    }
+
+    /**
+     * Recreate the peer connection for a new host connection. The host will send a fresh
+     * offer after the client re-joins, so this only tears down the stale state.
+     */
+    fun reset() {
+        close()
+        prepare()
     }
 
     /**
@@ -178,13 +239,48 @@ class MemberAudioEngine(
     private fun applyMicState() {
         val active = micLive
         val current = sender ?: return
-        runCatching {
+        val ok = runCatching {
             val params = current.parameters
             params.encodings.forEach { encoding ->
                 encoding.active = active
                 if (encoding.maxBitrateBps == null) encoding.maxBitrateBps = AUDIO_BITRATE_BPS
             }
             current.setParameters(params)
+        }.getOrDefault(false)
+        if (!ok) {
+            micLive = false
+            onPeerState("RTP parameter update failed; microphone marked muted")
+        }
+    }
+
+    private fun scheduleIceRecovery(state: PeerConnection.IceConnectionState) {
+        if (iceRestarting) return
+        iceRestarting = true
+        scope.launch {
+            delay(if (state == PeerConnection.IceConnectionState.FAILED) 0L else 2000L)
+            val connection = pc ?: run { iceRestarting = false; return@launch }
+            if (connection.connectionState() == PeerConnection.PeerConnectionState.CLOSED) {
+                iceRestarting = false
+                return@launch
+            }
+            // Rebuild the peer connection; the host will re-offer after it detects
+            // the member dropped, or the member re-joins.
+            runCatching { connection.close() }
+            runCatching { connection.dispose() }
+            synchronized(lock) {
+                pc = null
+                localTrack = null
+                sender = null
+                remoteTrack = null
+                sink = null
+                remoteDescriptionSet = false
+                pendingIce.clear()
+                micLive = false
+            }
+            runCatching { localTrack?.dispose() }
+            prepare()
+            iceRestarting = false
+            onPeerState("ICE $state recovered; peer connection rebuilt")
         }
     }
 
