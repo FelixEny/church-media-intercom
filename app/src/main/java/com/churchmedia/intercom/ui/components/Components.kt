@@ -77,6 +77,8 @@ fun StatusPill(text: String, tone: Tone = Tone.Neutral, modifier: Modifier = Mod
             style = MaterialTheme.typography.labelMedium,
             color = fg,
             fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
     }
 }
@@ -216,7 +218,9 @@ fun LevelMeter(label: String, level: Float, modifier: Modifier = Modifier) {
             text = label,
             style = MaterialTheme.typography.labelMedium,
             color = CommsColors.TextSecondary,
-            modifier = Modifier.width(64.dp),
+            modifier = Modifier.width(72.dp),
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
         Box(
             modifier = Modifier

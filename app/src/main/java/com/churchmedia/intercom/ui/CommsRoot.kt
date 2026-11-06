@@ -37,6 +37,7 @@ import com.churchmedia.intercom.core.model.Mode
 import com.churchmedia.intercom.core.net.LanNetwork
 import com.churchmedia.intercom.session.SessionController
 import com.churchmedia.intercom.ui.theme.CommsColors
+import kotlinx.coroutines.delay
 
 @Composable
 fun CommsRoot(controller: SessionController) {
@@ -85,6 +86,14 @@ fun CommsRoot(controller: SessionController) {
     }
     LaunchedEffect(showSettings) {
         if (showSettings) controller.refreshOutputs()
+    }
+
+    // Notices auto-dismiss so a busy session is not permanently squeezed by a banner.
+    LaunchedEffect(state.notice) {
+        if (state.notice != null) {
+            delay(4_000)
+            controller.clearNotice()
+        }
     }
 
     Box(
