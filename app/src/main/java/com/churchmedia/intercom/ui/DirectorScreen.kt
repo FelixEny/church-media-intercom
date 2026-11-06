@@ -79,6 +79,12 @@ fun DirectorScreen(
             color = CommsColors.TextSecondary,
         )
 
+        Text(
+            "Output: ${state.outputLabel ?: "Speaker"}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = CommsColors.TextSecondary,
+        )
+
         VerticalSpacer(16)
 
         val banner = when {

@@ -43,6 +43,15 @@ class SessionController(
     private var member: MemberSession? = null
 
     init {
+        audioRoute.onActiveDeviceChanged = { id, label ->
+            _state.update {
+                it.copy(
+                    outputId = id ?: it.outputId,
+                    outputLabel = label ?: it.outputLabel,
+                    outputs = audioRoute.outputs(),
+                )
+            }
+        }
         core.onMicLevel = { level ->
             _state.update { it.copy(micLevel = level) }
         }

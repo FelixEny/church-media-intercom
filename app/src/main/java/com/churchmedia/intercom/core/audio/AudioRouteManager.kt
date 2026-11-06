@@ -1,17 +1,31 @@
 package com.churchmedia.intercom.core.audio
 
 import android.content.Context
+import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import com.churchmedia.intercom.core.model.OutputDevice
 
 /**
  * Audio routing for a communication session.
  *
+ * Priority order, applied automatically and on every device change:
+ *   1. Wired headsets (including USB-C)
+ *   2. Bluetooth headsets (SCO preferred for duplex audio)
+ *   3. Phone loudspeaker, only when nothing external is connected
+ *
+ * A user selection overrides the automatic choice until that device disconnects,
+ * at which point the manager falls back to the priority order again.
+ *
  * Modern devices (API 31+) get explicit device selection through
  * `setCommunicationDevice`, which is what makes USB-C and Bluetooth predictable.
  * Older devices fall back to speakerphone/SCO flags.
+ *
+ * Device connect/disconnect is observed through [AudioDeviceCallback], so a headset
+ * plugged in mid-session is picked up without restarting the call.
  */
 class AudioRouteManager(context: Context) {
 
@@ -19,45 +33,36 @@ class AudioRouteManager(context: Context) {
     private val audioManager: AudioManager =
         appContext.getSystemService(AudioManager::class.java)
 
-    fun enterCommunicationMode() {
-        runCatching {
-            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-            applyBestRoute()
+    /** Called whenever the active output changes: (deviceId, label). */
+    var onActiveDeviceChanged: ((Int?, String?) -> Unit)? = null
+
+    private var userOverride: Boolean = false
+    private var userPreferredId: Int? = null
+    private var activeDeviceId: Int? = null
+
+    private val deviceCallback = object : AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
+            if (addedDevices.any { it.isSink }) handleDeviceChange()
+        }
+
+        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+            if (removedDevices.any { it.isSink }) handleDeviceChange()
         }
     }
 
-    /**
-     * Android never picks a sensible output for voice communication on its own: with no
-     * headset attached it routes to the earpiece, which is inaudible in a room. Ask for
-     * a wired/USB/Bluetooth device if one is connected, otherwise the loudspeaker.
-     *
-     * @return the id of the device now in use, or null when the platform kept its default.
-     */
-    fun applyBestRoute(): Int? {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val infos = audioManager.availableCommunicationDevices
-            val preferred = infos.firstOrNull { info ->
-                info.kind() in setOf(
-                    OutputDevice.Kind.WIRED,
-                    OutputDevice.Kind.USB,
-                    OutputDevice.Kind.BLUETOOTH,
-                )
-            } ?: infos.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+    private var callbackRegistered: Boolean = false
 
-            if (preferred != null) {
-                val ok = runCatching { audioManager.setCommunicationDevice(preferred) }.getOrDefault(false)
-                if (ok) return preferred.id
-            }
-            return audioManager.communicationDevice?.id
+    fun enterCommunicationMode() {
+        runCatching {
+            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            registerCallback()
+            applyRoute()
         }
-
-        @Suppress("DEPRECATION")
-        audioManager.isSpeakerphoneOn = true
-        return null
     }
 
     fun exitCommunicationMode() {
         runCatching {
+            unregisterCallback()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 audioManager.clearCommunicationDevice()
             } else {
@@ -70,6 +75,10 @@ class AudioRouteManager(context: Context) {
             }
             audioManager.mode = AudioManager.MODE_NORMAL
         }
+        userOverride = false
+        userPreferredId = null
+        activeDeviceId = null
+        notifyActive()
     }
 
     fun outputs(): List<OutputDevice> {
@@ -85,17 +94,81 @@ class AudioRouteManager(context: Context) {
         }.distinctBy { it.id }
     }
 
-    fun currentOutputId(): Int? = runCatching {
+    fun currentOutputId(): Int? = activeDeviceId ?: runCatching {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             audioManager.communicationDevice?.id
         } else {
-            // Pre-31 there is no communication device to query, and guessing would show
-            // the wrong radio button in Settings.
             null
         }
     }.getOrNull()
 
-    fun select(deviceId: Int): Boolean = runCatching {
+    /** User-initiated selection. Overrides automatic routing until that device disconnects. */
+    fun select(deviceId: Int): Boolean {
+        val available = outputs()
+        if (available.none { it.id == deviceId }) return false
+        userOverride = true
+        userPreferredId = deviceId
+        val ok = selectInternal(deviceId)
+        notifyActive()
+        return ok
+    }
+
+    fun selectSpeaker(): Boolean {
+        val speaker = outputs().firstOrNull { it.kind == OutputDevice.Kind.SPEAKER } ?: return false
+        return select(speaker.id)
+    }
+
+    private fun registerCallback() {
+        if (callbackRegistered) return
+        runCatching {
+            audioManager.registerAudioDeviceCallback(deviceCallback, Handler(Looper.getMainLooper()))
+            callbackRegistered = true
+        }
+    }
+
+    private fun unregisterCallback() {
+        if (!callbackRegistered) return
+        runCatching { audioManager.unregisterAudioDeviceCallback(deviceCallback) }
+        callbackRegistered = false
+    }
+
+    private fun handleDeviceChange() {
+        applyRoute()
+    }
+
+    private fun applyRoute() {
+        val available = outputs()
+
+        // If the user picked a device and it is still connected, keep it.
+        if (userOverride && userPreferredId != null && available.any { it.id == userPreferredId }) {
+            if (activeDeviceId != userPreferredId) {
+                selectInternal(userPreferredId!!)
+            }
+            notifyActive()
+            return
+        }
+
+        // Preferred device gone: drop the override and go automatic.
+        if (userOverride && userPreferredId != null && available.none { it.id == userPreferredId }) {
+            userOverride = false
+            userPreferredId = null
+        }
+
+        val targetId = AudioRoutingPolicy.bestRoute(available, null, false)
+
+        if (targetId != null && targetId != activeDeviceId) {
+            selectInternal(targetId)
+        } else if (targetId == null && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            // Pre-31: no communication device to query; use the speakerphone flag.
+            @Suppress("DEPRECATION")
+            audioManager.isSpeakerphoneOn = true
+            activeDeviceId = available.firstOrNull { it.kind == OutputDevice.Kind.SPEAKER }?.id
+        }
+
+        notifyActive()
+    }
+
+    private fun selectInternal(deviceId: Int): Boolean {
         val infos: List<AudioDeviceInfo> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             audioManager.availableCommunicationDevices
         } else {
@@ -103,34 +176,40 @@ class AudioRouteManager(context: Context) {
         }
         val target = infos.firstOrNull { it.id == deviceId } ?: return false
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            audioManager.setCommunicationDevice(target)
+        val ok = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            runCatching { audioManager.setCommunicationDevice(target) }.getOrDefault(false)
         } else {
-            when (target.type) {
-                AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> {
-                    @Suppress("DEPRECATION")
-                    audioManager.isSpeakerphoneOn = true
+            runCatching {
+                when (target.type) {
+                    AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> {
+                        @Suppress("DEPRECATION")
+                        audioManager.isSpeakerphoneOn = true
+                    }
+                    AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+                    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                    -> {
+                        @Suppress("DEPRECATION")
+                        audioManager.startBluetoothSco()
+                        @Suppress("DEPRECATION")
+                        audioManager.isBluetoothScoOn = true
+                    }
+                    else -> {
+                        @Suppress("DEPRECATION")
+                        audioManager.isSpeakerphoneOn = false
+                    }
                 }
-                AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
-                AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-                -> {
-                    @Suppress("DEPRECATION")
-                    audioManager.startBluetoothSco()
-                    @Suppress("DEPRECATION")
-                    audioManager.isBluetoothScoOn = true
-                }
-                else -> {
-                    @Suppress("DEPRECATION")
-                    audioManager.isSpeakerphoneOn = false
-                }
-            }
+                true
+            }.getOrDefault(false)
         }
-        true
-    }.getOrDefault(false)
 
-    fun selectSpeaker(): Boolean {
-        val speaker = outputs().firstOrNull { it.kind == OutputDevice.Kind.SPEAKER } ?: return false
-        return select(speaker.id)
+        if (ok) activeDeviceId = deviceId
+        return ok
+    }
+
+    private fun notifyActive() {
+        val label = outputs().firstOrNull { it.id == activeDeviceId }?.label
+            ?: if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) "Speaker" else null
+        onActiveDeviceChanged?.invoke(activeDeviceId, label)
     }
 
     private fun label(info: AudioDeviceInfo, kind: OutputDevice.Kind): String {
@@ -164,5 +243,27 @@ class AudioRouteManager(context: Context) {
         AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
         -> OutputDevice.Kind.BLUETOOTH
         else -> null
+    }
+}
+
+/**
+ * Pure routing policy. Tested independently of Android.
+ *
+ * Priority: wired > USB > Bluetooth > speaker. A user override wins while the
+ * preferred device is still connected; otherwise we fall back to the priority order.
+ */
+object AudioRoutingPolicy {
+    fun bestRoute(
+        devices: List<OutputDevice>,
+        preferredId: Int?,
+        userOverride: Boolean,
+    ): Int? {
+        if (userOverride && preferredId != null && devices.any { it.id == preferredId }) {
+            return preferredId
+        }
+        return devices.firstOrNull { it.kind == OutputDevice.Kind.WIRED }?.id
+            ?: devices.firstOrNull { it.kind == OutputDevice.Kind.USB }?.id
+            ?: devices.firstOrNull { it.kind == OutputDevice.Kind.BLUETOOTH }?.id
+            ?: devices.firstOrNull { it.kind == OutputDevice.Kind.SPEAKER }?.id
     }
 }

@@ -54,6 +54,11 @@ fun MemberScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = CommsColors.TextSecondary,
                 )
+                Text(
+                    "Output: ${state.outputLabel ?: "Speaker"}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CommsColors.TextSecondary,
+                )
             }
             Spacer(Modifier.weight(1f))
             StatusPill(
