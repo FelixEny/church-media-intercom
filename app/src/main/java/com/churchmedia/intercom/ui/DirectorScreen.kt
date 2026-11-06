@@ -87,6 +87,12 @@ fun DirectorScreen(
             color = CommsColors.TextSecondary,
         )
 
+        Text(
+            "Mic: ${state.inputLabel ?: "Phone microphone"}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = CommsColors.TextSecondary,
+        )
+
         VerticalSpacer(16)
 
         val banner = when {

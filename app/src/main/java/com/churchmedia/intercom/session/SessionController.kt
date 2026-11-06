@@ -50,6 +50,7 @@ class SessionController(
                 it.copy(
                     outputId = id ?: it.outputId,
                     outputLabel = label ?: it.outputLabel,
+                    inputLabel = audioRoute.currentInputLabel(),
                     outputs = audioRoute.outputs(),
                 )
             }
@@ -359,7 +360,11 @@ class SessionController(
     fun refreshOutputs() {
         val outputs = audioRoute.outputs()
         _state.update {
-            it.copy(outputs = outputs, outputId = audioRoute.currentOutputId() ?: it.outputId)
+            it.copy(
+                outputs = outputs,
+                outputId = audioRoute.currentOutputId() ?: it.outputId,
+                inputLabel = audioRoute.currentInputLabel(),
+            )
         }
     }
 

@@ -62,6 +62,11 @@ fun MemberScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = CommsColors.TextSecondary,
                 )
+                Text(
+                    "Mic: ${state.inputLabel ?: "Phone microphone"}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CommsColors.TextSecondary,
+                )
             }
             Spacer(Modifier.weight(1f))
             StatusPill(

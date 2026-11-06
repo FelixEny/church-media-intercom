@@ -102,6 +102,32 @@ class AudioRouteManager(context: Context) {
         }
     }.getOrNull()
 
+    /**
+     * Label of the microphone that is actually capturing.
+     *
+     * There is no public API to query the routed input of the AudioRecord inside the
+     * audio device module, so this derives it from the active output: in communication
+     * mode the input follows the output device, and wired/USB headsets without a
+     * microphone fall back to the phone mic.
+     */
+    fun currentInputLabel(): String {
+        val activeKind = outputs().firstOrNull { it.id == activeDeviceId }?.kind
+        val inputs = runCatching {
+            audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS).toList()
+        }.getOrDefault(emptyList())
+
+        val hasWiredMic = inputs.any {
+            it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET || it.type == AudioDeviceInfo.TYPE_USB_HEADSET
+        }
+
+        return when (activeKind) {
+            OutputDevice.Kind.BLUETOOTH -> "Bluetooth microphone"
+            OutputDevice.Kind.WIRED, OutputDevice.Kind.USB ->
+                if (hasWiredMic) "Headset microphone" else "Phone microphone"
+            else -> "Phone microphone"
+        }
+    }
+
     /** User-initiated selection. Overrides automatic routing until that device disconnects. */
     fun select(deviceId: Int): Boolean {
         val available = outputs()

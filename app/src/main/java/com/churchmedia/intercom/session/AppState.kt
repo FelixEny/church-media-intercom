@@ -27,6 +27,8 @@ data class AppState(
     val micLevel: Float = 0f,
     /** Label of the currently active audio output, or null when unknown. */
     val outputLabel: String? = null,
+    /** Label of the microphone currently capturing. */
+    val inputLabel: String? = null,
     val members: List<Member> = emptyList(),
     val floor: FloorState = FloorState.Free,
     val recipients: Set<String> = emptySet(),

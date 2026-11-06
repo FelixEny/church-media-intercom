@@ -114,6 +114,12 @@ fun SettingsScreen(
         VerticalSpacer(12)
 
         SectionCard(title = "Audio output") {
+            Text(
+                "Microphone: ${state.inputLabel ?: "Phone microphone"}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = CommsColors.TextSecondary,
+            )
+            VerticalSpacer(8)
             if (state.outputs.isEmpty()) {
                 Text(
                     "No outputs detected. Connect a headset or refresh.",
