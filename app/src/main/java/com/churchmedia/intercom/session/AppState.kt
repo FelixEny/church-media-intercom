@@ -6,6 +6,7 @@ import com.churchmedia.intercom.core.model.LinkState
 import com.churchmedia.intercom.core.model.Member
 import com.churchmedia.intercom.core.model.Mode
 import com.churchmedia.intercom.core.model.OutputDevice
+import com.churchmedia.intercom.core.model.Reaction
 import com.churchmedia.intercom.core.model.Role
 
 /** Everything the UI renders, as one immutable snapshot. */
@@ -30,6 +31,8 @@ data class AppState(
     val floor: FloorState = FloorState.Free,
     val recipients: Set<String> = emptySet(),
     val everyone: Boolean = true,
+    /** Transient thumbs-up reactions currently visible to this side. */
+    val reactions: List<Reaction> = emptyList(),
     val noiseSuppression: Boolean = true,
     val processingSummary: String = "",
     val volume: Float = 1f,

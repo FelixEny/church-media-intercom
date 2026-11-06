@@ -118,6 +118,7 @@ fun CommsRoot(controller: SessionController) {
                 onToggleMic = controller::toggleDirectorMic,
                 onToggleRecipient = controller::toggleRecipient,
                 onEveryone = controller::setEveryone,
+                onSendThumbsUp = { id -> controller.sendThumbsUp(id) },
                 onEnd = {
                     showSettings = false
                     controller.endSession()
@@ -128,6 +129,7 @@ fun CommsRoot(controller: SessionController) {
             state.mode == Mode.MEMBER -> MemberScreen(
                 state = state,
                 onToggleMic = controller::toggleMemberMic,
+                onSendThumbsUp = controller::sendThumbsUp,
                 onVolume = controller::setVolume,
                 onEnd = {
                     showSettings = false

@@ -20,6 +20,7 @@ class ProtocolTest {
             ClientMessage.Mic(true),
             ClientMessage.Ping(1234L),
             ClientMessage.Bye,
+            ClientMessage.ThumbsUp,
         )
 
         messages.forEach { original ->
@@ -45,6 +46,7 @@ class ProtocolTest {
             ServerMessage.Bye("Session ended"),
             ServerMessage.Error("Busy"),
             ServerMessage.Reject("Wrong session code"),
+            ServerMessage.ThumbsUp("director", "Felix", "m-1"),
         )
 
         messages.forEach { original ->

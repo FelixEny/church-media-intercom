@@ -1,5 +1,6 @@
 package com.churchmedia.intercom.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.ThumbUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +36,7 @@ import com.churchmedia.intercom.ui.theme.CommsColors
 fun MemberScreen(
     state: AppState,
     onToggleMic: () -> Unit,
+    onSendThumbsUp: () -> Unit,
     onVolume: (Float) -> Unit,
     onEnd: () -> Unit,
     onSettings: () -> Unit,
@@ -76,6 +79,9 @@ fun MemberScreen(
                     LinkState.IDLE -> Tone.Neutral
                 },
             )
+            IconButton(onClick = onSendThumbsUp, enabled = connected) {
+                Icon(Icons.Rounded.ThumbUp, contentDescription = "Send thumbs up to the director", tint = CommsColors.Accent)
+            }
             IconButton(onClick = onSettings) {
                 Icon(Icons.Rounded.Settings, contentDescription = "Audio settings", tint = CommsColors.TextSecondary)
             }
@@ -85,6 +91,22 @@ fun MemberScreen(
 
         val banner = FloorPresentation.banner(state)
         FloorBanner(banner.first, banner.second)
+
+        val incomingReactions = state.reactions.filter { it.toId == state.myId || it.toId == null }
+        if (incomingReactions.isNotEmpty()) {
+            VerticalSpacer(10)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("👍", style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    "${incomingReactions.last().fromName} sent a thumbs-up",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CommsColors.Accent,
+                )
+            }
+        }
 
         if (!FloorPresentation.canSpeak(state) && connected) {
             VerticalSpacer(6)

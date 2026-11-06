@@ -9,6 +9,7 @@ import com.churchmedia.intercom.core.model.MAX_MEMBERS
 import com.churchmedia.intercom.core.model.Member
 import com.churchmedia.intercom.core.model.PROTOCOL_VERSION
 import com.churchmedia.intercom.core.model.Role
+import com.churchmedia.intercom.core.model.Reaction
 import com.churchmedia.intercom.core.net.LanNetwork
 import com.churchmedia.intercom.core.signaling.ClientMessage
 import com.churchmedia.intercom.core.signaling.MemberDto
@@ -18,6 +19,11 @@ import com.churchmedia.intercom.core.signaling.ServerMessage
 import com.churchmedia.intercom.core.signaling.SignalingServer
 import com.churchmedia.intercom.core.signaling.toDto
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Host role: owns the signalling server, the roster, the floor, and the N peer
@@ -34,6 +40,8 @@ class DirectorSession(
     interface Callbacks {
         fun onRoster(members: List<Member>, floor: FloorState)
         fun onNotice(message: String)
+        fun onReaction(reaction: Reaction)
+        fun onReactionExpired(id: String)
         fun onEnded(reason: String)
     }
 
@@ -45,6 +53,8 @@ class DirectorSession(
 
     private val clients = ConcurrentHashMap<String, ClientEntry>()
     private val floor = FloorController()
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     @Volatile
     private var started = false
@@ -107,6 +117,19 @@ class DirectorSession(
 
     fun describeProcessing(): String = core.describeProcessing()
 
+    fun sendThumbsUp(memberId: String) {
+        val entry = clients.values.firstOrNull { it.memberId == memberId } ?: return
+        val reaction = Reaction(
+            id = java.util.UUID.randomUUID().toString().take(8),
+            fromId = DIRECTOR_ID,
+            fromName = hostName,
+            toId = memberId,
+            createdAt = System.currentTimeMillis(),
+            expiresAt = System.currentTimeMillis() + REACTION_TTL_MS,
+        )
+        server.send(entry.clientId, ServerMessage.ThumbsUp(reaction.fromId, reaction.fromName, reaction.toId))
+    }
+
     // --------------------------------------------------------------- signalling
 
     private fun handleMessage(clientId: String, message: ClientMessage) {
@@ -119,6 +142,7 @@ class DirectorSession(
             ClientMessage.FloorRequest -> handleFloorRequest(clientId)
             ClientMessage.FloorRelease -> handleFloorRelease(clientId)
             is ClientMessage.Mic -> broadcastRoster()
+            ClientMessage.ThumbsUp -> clients[clientId]?.let { handleThumbsUp(it) }
             is ClientMessage.Ping -> server.send(
                 clientId,
                 ServerMessage.Pong(message.sentAt, System.currentTimeMillis()),
@@ -199,6 +223,22 @@ class DirectorSession(
         server.send(clientId, ServerMessage.Floor(floor.current.toDto()))
     }
 
+    private fun handleThumbsUp(entry: ClientEntry) {
+        val reaction = Reaction(
+            id = java.util.UUID.randomUUID().toString().take(8),
+            fromId = entry.memberId,
+            fromName = entry.name,
+            toId = DIRECTOR_ID,
+            createdAt = System.currentTimeMillis(),
+            expiresAt = System.currentTimeMillis() + REACTION_TTL_MS,
+        )
+        callbacks.onReaction(reaction)
+        scope.launch {
+            kotlinx.coroutines.delay(REACTION_TTL_MS)
+            callbacks.onReactionExpired(reaction.id)
+        }
+    }
+
     private fun applyFloor() {
         val holder = floor.current
         engine.setMicLive(holder is FloorState.Director)
@@ -258,5 +298,6 @@ class DirectorSession(
 
     companion object {
         const val DIRECTOR_ID = "director"
+        const val REACTION_TTL_MS = 3000L
     }
 }

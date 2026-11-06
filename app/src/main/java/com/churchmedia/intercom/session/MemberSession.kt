@@ -6,11 +6,14 @@ import com.churchmedia.intercom.core.audio.WebRtcCore
 import com.churchmedia.intercom.core.model.FloorState
 import com.churchmedia.intercom.core.model.LinkState
 import com.churchmedia.intercom.core.model.Member
+import com.churchmedia.intercom.core.model.Reaction
 import com.churchmedia.intercom.core.signaling.ClientMessage
 import com.churchmedia.intercom.core.signaling.ServerMessage
 import com.churchmedia.intercom.core.signaling.SignalingClient
 import com.churchmedia.intercom.core.signaling.toModel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Member role: one connection, one peer connection, one floor request at a time. */
 class MemberSession(
@@ -27,6 +30,8 @@ class MemberSession(
         fun onRoster(members: List<Member>, floor: FloorState)
         fun onWelcome(hostName: String, myId: String)
         fun onRemoteLevel(level: Float)
+        fun onReaction(reaction: Reaction)
+        fun onReactionExpired(id: String)
         fun onNotice(message: String)
         fun onEnded(reason: String)
     }
@@ -75,6 +80,10 @@ class MemberSession(
         engine.setVolume(value)
     }
 
+    fun sendThumbsUp() {
+        client.send(ClientMessage.ThumbsUp)
+    }
+
     private fun handleMessage(message: ServerMessage) {
         when (message) {
             is ServerMessage.Welcome -> {
@@ -109,6 +118,8 @@ class MemberSession(
 
             is ServerMessage.Pong -> Unit
 
+            is ServerMessage.ThumbsUp -> handleThumbsUp(message)
+
             is ServerMessage.Reject -> {
                 callbacks.onEnded(message.reason)
                 stop()
@@ -126,5 +137,26 @@ class MemberSession(
     private fun applyFloor() {
         val mine = myId.isNotEmpty() && (floor as? FloorState.Member)?.id == myId
         engine.setMicLive(mine)
+    }
+
+    private fun handleThumbsUp(message: ServerMessage.ThumbsUp) {
+        if (message.toId != null && message.toId != myId) return
+        val reaction = Reaction(
+            id = java.util.UUID.randomUUID().toString().take(8),
+            fromId = message.fromId,
+            fromName = message.fromName,
+            toId = message.toId,
+            createdAt = System.currentTimeMillis(),
+            expiresAt = System.currentTimeMillis() + REACTION_TTL_MS,
+        )
+        callbacks.onReaction(reaction)
+        scope.launch {
+            kotlinx.coroutines.delay(REACTION_TTL_MS)
+            callbacks.onReactionExpired(reaction.id)
+        }
+    }
+
+    companion object {
+        const val REACTION_TTL_MS = 3000L
     }
 }

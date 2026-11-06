@@ -49,6 +49,16 @@ enum class Mode { IDLE, DIRECTOR, MEMBER }
 /** Coarse connection state used by the status pills. */
 enum class LinkState { IDLE, CONNECTING, CONNECTED, RECONNECTING, FAILED }
 
+/** A transient thumbs-up reaction. Auto-clears after [expiresAt]. */
+data class Reaction(
+    val id: String,
+    val fromId: String,
+    val fromName: String,
+    val toId: String?,
+    val createdAt: Long,
+    val expiresAt: Long,
+)
+
 data class SessionInfo(
     val code: String,
     val hostName: String,

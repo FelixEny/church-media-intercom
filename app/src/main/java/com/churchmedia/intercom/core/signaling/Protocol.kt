@@ -57,6 +57,10 @@ sealed interface ClientMessage {
     @Serializable
     @SerialName("bye")
     data object Bye : ClientMessage
+
+    @Serializable
+    @SerialName("thumbsup")
+    data object ThumbsUp : ClientMessage
 }
 
 @Serializable
@@ -110,6 +114,14 @@ sealed interface ServerMessage {
     @Serializable
     @SerialName("error")
     data class Error(val message: String) : ServerMessage
+
+    @Serializable
+    @SerialName("thumbsup")
+    data class ThumbsUp(
+        val fromId: String,
+        val fromName: String,
+        val toId: String? = null,
+    ) : ServerMessage
 }
 
 @Serializable

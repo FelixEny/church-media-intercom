@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.ThumbUp
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -46,6 +47,7 @@ fun DirectorScreen(
     onToggleMic: () -> Unit,
     onToggleRecipient: (String) -> Unit,
     onEveryone: () -> Unit,
+    onSendThumbsUp: (String) -> Unit,
     onEnd: () -> Unit,
     onSettings: () -> Unit,
 ) {
@@ -142,7 +144,11 @@ fun DirectorScreen(
                     MemberSelectRow(
                         member = member,
                         selected = state.everyone || state.recipients.contains(member.id),
+                        hasReaction = state.reactions.any { r ->
+                            r.fromId == member.id && r.toId == "director"
+                        },
                         onToggle = { onToggleRecipient(member.id) },
+                        onSendThumbsUp = { onSendThumbsUp(member.id) },
                     )
                 }
             }
@@ -167,7 +173,9 @@ fun DirectorScreen(
 private fun MemberSelectRow(
     member: Member,
     selected: Boolean,
+    hasReaction: Boolean,
     onToggle: () -> Unit,
+    onSendThumbsUp: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -180,7 +188,12 @@ private fun MemberSelectRow(
     ) {
         Checkbox(checked = selected, onCheckedChange = { onToggle() })
         Column(modifier = Modifier.weight(1f)) {
-            Text(member.name, style = MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(member.name, style = MaterialTheme.typography.titleMedium)
+                if (hasReaction) {
+                    Text("👍", style = MaterialTheme.typography.titleMedium)
+                }
+            }
             Text(
                 when {
                     member.micLive -> "Replying to you"
@@ -192,5 +205,8 @@ private fun MemberSelectRow(
             )
         }
         if (member.micLive) StatusPill("Live", Tone.Accent)
+        IconButton(onClick = onSendThumbsUp) {
+            Icon(Icons.Rounded.ThumbUp, contentDescription = "Send thumbs up to ${member.name}", tint = CommsColors.TextSecondary)
+        }
     }
 }

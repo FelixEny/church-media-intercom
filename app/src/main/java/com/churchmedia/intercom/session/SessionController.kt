@@ -7,6 +7,8 @@ import com.churchmedia.intercom.core.model.DEFAULT_PORT
 import com.churchmedia.intercom.core.model.FloorState
 import com.churchmedia.intercom.core.model.LinkState
 import com.churchmedia.intercom.core.model.Member
+import com.churchmedia.intercom.core.model.Reaction
+import com.churchmedia.intercom.core.model.ReactionList
 import com.churchmedia.intercom.core.model.Mode
 import com.churchmedia.intercom.core.net.LanNetwork
 import com.churchmedia.intercom.core.net.LanNetworkBinder
@@ -111,6 +113,14 @@ class SessionController(
 
                 override fun onNotice(message: String) {
                     _state.update { it.copy(notice = message) }
+                }
+
+                override fun onReaction(reaction: Reaction) {
+                    _state.update { it.copy(reactions = ReactionList.add(it.reactions, reaction)) }
+                }
+
+                override fun onReactionExpired(id: String) {
+                    _state.update { it.copy(reactions = it.reactions.filter { r -> r.id != id }) }
                 }
 
                 override fun onEnded(reason: String) {
@@ -228,6 +238,14 @@ class SessionController(
                     _state.update { it.copy(remoteLevel = level) }
                 }
 
+                override fun onReaction(reaction: Reaction) {
+                    _state.update { it.copy(reactions = ReactionList.add(it.reactions, reaction)) }
+                }
+
+                override fun onReactionExpired(id: String) {
+                    _state.update { it.copy(reactions = it.reactions.filter { r -> r.id != id }) }
+                }
+
                 override fun onNotice(message: String) {
                     _state.update { it.copy(notice = message) }
                 }
@@ -278,6 +296,16 @@ class SessionController(
 
     fun toggleMemberMic() {
         member?.toggleMic()
+    }
+
+    /** Director sends a thumbs-up to a single participant. */
+    fun sendThumbsUp(memberId: String) {
+        director?.sendThumbsUp(memberId)
+    }
+
+    /** Participant sends a thumbs-up to the director. */
+    fun sendThumbsUp() {
+        member?.sendThumbsUp()
     }
 
     fun setRecipients(ids: Set<String>) {
