@@ -36,6 +36,7 @@ class MemberAudioEngine(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val lock = Any()
 
+    private val stats = AudioStatsPoller("MEMBER")
     private var pc: PeerConnection? = null
     private var localTrack: AudioTrack? = null
     private var sender: RtpSender? = null
@@ -86,6 +87,7 @@ class MemberAudioEngine(
             )
             pc = connection
             localTrack = core.createLocalTrack("mic")
+            stats.start(connection)
         }
     }
 
@@ -118,6 +120,16 @@ class MemberAudioEngine(
                     if (local != null && audio.sender.setTrack(local, false)) {
                         sender = audio.sender
                         applyMicState()
+                    }
+
+                    // Fallback: onTrack can fire before the receiver's track is ready;
+                    // make sure the level sink is attached either way.
+                    if (synchronized(lock) { remoteTrack == null }) {
+                        connection.receivers.firstNotNullOfOrNull { it.track() as? AudioTrack }?.let { remote ->
+                            remote.setEnabled(true)
+                            remote.setVolume(volume.toDouble())
+                            attachLevelSink(remote)
+                        }
                     }
                     connection.createAnswer(
                         SdpAdapter(
@@ -166,6 +178,7 @@ class MemberAudioEngine(
     }
 
     fun close() {
+        stats.stop()
         synchronized(lock) {
             runCatching { remoteTrack?.removeSink(sink) }
             runCatching { pc?.close() }

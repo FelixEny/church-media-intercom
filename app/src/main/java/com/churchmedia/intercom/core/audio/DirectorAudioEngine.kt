@@ -32,6 +32,7 @@ class DirectorAudioEngine(
         val pc: PeerConnection,
         val track: AudioTrack,
         val sender: RtpSender,
+        val stats: AudioStatsPoller = AudioStatsPoller("DIR[$memberId]"),
         var remote: AudioTrack? = null,
         var selected: Boolean = false,
         var micLive: Boolean = false,
@@ -100,6 +101,7 @@ class DirectorAudioEngine(
         link.selected = everyone || recipients.contains(memberId)
         link.micLive = micLive
         links[memberId] = link
+        link.stats.start(pc)
 
         applyRouting(link)
 
@@ -122,6 +124,7 @@ class DirectorAudioEngine(
 
     fun removeMember(memberId: String) {
         val link = links.remove(memberId) ?: return
+        link.stats.stop()
         runCatching { link.pc.close() }
         runCatching { link.pc.dispose() }
         runCatching { link.track.dispose() }
@@ -176,7 +179,15 @@ class DirectorAudioEngine(
 
     fun setMicLive(live: Boolean) {
         micLive = live
-        synchronized(lock) { links.values.forEach { applyRouting(it) } }
+        synchronized(lock) {
+            links.values.forEach { link ->
+                // Per-link copy must be refreshed too: applyRouting() reads link.micLive,
+                // and links created while the mic was off would otherwise stay inactive
+                // forever even after the director goes live.
+                link.micLive = live
+                applyRouting(link)
+            }
+        }
     }
 
     /** Only the floor holder is audible; everyone else is muted at the receiver. */
@@ -199,6 +210,7 @@ class DirectorAudioEngine(
     fun closeAll() {
         synchronized(lock) {
             links.values.forEach { link ->
+                link.stats.stop()
                 runCatching { link.pc.close() }
                 runCatching { link.pc.dispose() }
                 runCatching { link.track.dispose() }
