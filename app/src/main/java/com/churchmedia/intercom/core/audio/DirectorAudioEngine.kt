@@ -81,7 +81,15 @@ class DirectorAudioEngine(
                         synchronized(lock) { links[memberId]?.remote = track }
                     }
                 },
-                onState = { state -> onPeerState(memberId, state.name) },
+                onState = { state ->
+                    android.util.Log.i("COMMS_STATS", "DIR[$memberId] peer state: ${state.name}")
+                    val message = when (state) {
+                        PeerConnection.PeerConnectionState.CONNECTED -> "Audio connected"
+                        PeerConnection.PeerConnectionState.FAILED -> "Audio connection problem"
+                        else -> null
+                    }
+                    if (message != null) onPeerState(memberId, message)
+                },
                 onIceConnectionChange = { state ->
                     when (state) {
                         PeerConnection.IceConnectionState.FAILED ->
@@ -111,12 +119,18 @@ class DirectorAudioEngine(
                     pc.setLocalDescription(
                         SdpAdapter(
                             onSetSuccess = { onOffer(memberId, offer.description) },
-                            onFailure = { error -> onPeerState(memberId, "setLocalDescription failed: $error") },
+                            onFailure = { error ->
+                                android.util.Log.w("COMMS_STATS", "DIR[$memberId] setLocalDescription failed: $error")
+                                onPeerState(memberId, "Audio connection problem")
+                            },
                         ),
                         offer,
                     )
                 },
-                onFailure = { error -> onPeerState(memberId, "offer failed: $error") },
+                onFailure = { error ->
+                    android.util.Log.w("COMMS_STATS", "DIR[$memberId] createOffer failed: $error")
+                    onPeerState(memberId, "Audio connection problem")
+                },
             ),
             MediaConstraints(),
         )
@@ -139,13 +153,16 @@ class DirectorAudioEngine(
                         link.remoteDescriptionSet = true
                         link.iceQueue.forEach { queued ->
                             if (!link.pc.addIceCandidate(queued)) {
-                                onPeerState(memberId, "Queued ICE candidate rejected")
+                                android.util.Log.w("COMMS_STATS", "DIR[$memberId] queued ICE candidate rejected")
                             }
                         }
                         link.iceQueue.clear()
                     }
                 },
-                onFailure = { error -> onPeerState(memberId, "answer failed: $error") },
+                onFailure = { error ->
+                    android.util.Log.w("COMMS_STATS", "DIR[$memberId] setRemoteDescription failed: $error")
+                    onPeerState(memberId, "Audio connection problem")
+                },
             ),
             SessionDescription(SessionDescription.Type.ANSWER, sdp),
         )
@@ -161,7 +178,7 @@ class DirectorAudioEngine(
             }
         }
         if (!link.pc.addIceCandidate(ice)) {
-            onPeerState(memberId, "ICE candidate rejected")
+            android.util.Log.w("COMMS_STATS", "DIR[$memberId] ICE candidate rejected")
         }
     }
 
@@ -234,7 +251,8 @@ class DirectorAudioEngine(
             val ok = link.sender.setParameters(params)
             if (!ok) {
                 link.micLive = false
-                onPeerState(link.memberId, "RTP parameter update failed; transmission disabled")
+                android.util.Log.w("COMMS_STATS", "DIR[${link.memberId}] RTP parameter update failed")
+                onPeerState(link.memberId, "Microphone problem")
             }
         }
     }
@@ -268,7 +286,8 @@ class DirectorAudioEngine(
                                     current.iceRestarting = false
                                 },
                                 onFailure = { error ->
-                                    onPeerState(memberId, "ice-restart setLocalDescription failed: $error")
+                                    android.util.Log.w("COMMS_STATS", "DIR[$memberId] ice-restart setLocalDescription failed: $error")
+                                    onPeerState(memberId, "Audio connection problem")
                                     current.iceRestarting = false
                                 },
                             ),
@@ -276,7 +295,8 @@ class DirectorAudioEngine(
                         )
                     },
                     onFailure = { error ->
-                        onPeerState(memberId, "ice-restart createOffer failed: $error")
+                        android.util.Log.w("COMMS_STATS", "DIR[$memberId] ice-restart createOffer failed: $error")
+                        onPeerState(memberId, "Audio connection problem")
                         current.iceRestarting = false
                     },
                 ),

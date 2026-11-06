@@ -75,7 +75,15 @@ class MemberAudioEngine(
                             attachLevelSink(track)
                         }
                     },
-                    onState = { state -> onPeerState(state.name) },
+                    onState = { state ->
+                        android.util.Log.i("COMMS_STATS", "MEMBER peer state: ${state.name}")
+                        val message = when (state) {
+                            PeerConnection.PeerConnectionState.CONNECTED -> "Audio connected"
+                            PeerConnection.PeerConnectionState.FAILED -> "Audio connection problem"
+                            else -> null
+                        }
+                        if (message != null) onPeerState(message)
+                    },
                     onIceConnectionChange = { state ->
                         if (state == PeerConnection.IceConnectionState.FAILED ||
                             state == PeerConnection.IceConnectionState.DISCONNECTED
@@ -102,7 +110,7 @@ class MemberAudioEngine(
                         remoteDescriptionSet = true
                         pendingIce.forEach { queued ->
                             if (!connection.addIceCandidate(queued)) {
-                                onPeerState("Queued ICE candidate rejected")
+                                android.util.Log.w("COMMS_STATS", "Queued ICE candidate rejected")
                             }
                         }
                         pendingIce.clear()
@@ -112,7 +120,8 @@ class MemberAudioEngine(
                         it.mediaType == MediaStreamTrack.MediaType.MEDIA_TYPE_AUDIO
                     }
                     if (audio == null) {
-                        onPeerState("Offer had no audio section")
+                        android.util.Log.w("COMMS_STATS", "Offer had no audio section")
+                        onPeerState("Audio connection problem")
                         return@SdpAdapter
                     }
                     audio.setDirection(RtpTransceiver.RtpTransceiverDirection.SEND_RECV)
@@ -137,17 +146,26 @@ class MemberAudioEngine(
                                 connection.setLocalDescription(
                                     SdpAdapter(
                                         onSetSuccess = { onAnswer(answer.description) },
-                                        onFailure = { error -> onPeerState("setLocalDescription failed: $error") },
+                                        onFailure = { error ->
+                                            android.util.Log.w("COMMS_STATS", "setLocalDescription failed: $error")
+                                            onPeerState("Audio connection problem")
+                                        },
                                     ),
                                     answer,
                                 )
                             },
-                            onFailure = { error -> onPeerState("answer failed: $error") },
+                            onFailure = { error ->
+                                android.util.Log.w("COMMS_STATS", "createAnswer failed: $error")
+                                onPeerState("Audio connection problem")
+                            },
                         ),
                         MediaConstraints(),
                     )
                 },
-                onFailure = { error -> onPeerState("remote description failed: $error") },
+                onFailure = { error ->
+                    android.util.Log.w("COMMS_STATS", "setRemoteDescription failed: $error")
+                    onPeerState("Audio connection problem")
+                },
             ),
             SessionDescription(SessionDescription.Type.OFFER, sdp),
         )
@@ -163,7 +181,7 @@ class MemberAudioEngine(
             }
         }
         val ok = connection.addIceCandidate(ice)
-        if (!ok) onPeerState("ICE candidate rejected")
+        if (!ok) android.util.Log.w("COMMS_STATS", "ICE candidate rejected")
     }
 
     /** Member only transmits while it holds the floor. */
@@ -262,7 +280,8 @@ class MemberAudioEngine(
         }.getOrDefault(false)
         if (!ok) {
             micLive = false
-            onPeerState("RTP parameter update failed; microphone marked muted")
+            android.util.Log.w("COMMS_STATS", "RTP parameter update failed")
+            onPeerState("Microphone problem — tap to retry")
         }
     }
 
@@ -293,7 +312,8 @@ class MemberAudioEngine(
             runCatching { localTrack?.dispose() }
             prepare()
             iceRestarting = false
-            onPeerState("ICE $state recovered; peer connection rebuilt")
+            android.util.Log.i("COMMS_STATS", "ICE $state recovered; peer connection rebuilt")
+            onPeerState("Audio connection restored")
         }
     }
 

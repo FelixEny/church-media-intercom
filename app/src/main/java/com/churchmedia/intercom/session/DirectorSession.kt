@@ -91,7 +91,6 @@ class DirectorSession(
         runCatching { server.broadcast(ServerMessage.Bye(reason)) }
         runCatching { server.stop() }
         runCatching { engine.closeAll() }
-        runCatching { audioRoute.exitCommunicationMode() }
         floor.reset()
         clients.clear()
     }

@@ -79,7 +79,9 @@ class SignalingServer(
         isRunning = false
         outboxes.values.forEach { it.close() }
         outboxes.clear()
-        server?.stop(0, 500)
+        // Grace period so queued frames (the `bye` broadcast) flush before the sockets
+        // die; otherwise members see a dropped connection instead of an orderly end.
+        server?.stop(400, 1_000)
         server = null
     }
 

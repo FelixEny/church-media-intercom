@@ -95,12 +95,11 @@ class SignalingClient(
 
             if (stopped) break
             attempt++
-            delay(backoffMillis(attempt))
+            if (!ReconnectPolicy.shouldRetry(attempt)) {
+                onState(LinkState.FAILED, "The director is offline. The session may have ended.")
+                return
+            }
+            delay(ReconnectPolicy.backoffMillis(attempt))
         }
-    }
-
-    private fun backoffMillis(attempt: Int): Long {
-        val base = 500L shl (attempt.coerceIn(1, 5) - 1)
-        return base.coerceAtMost(8_000L)
     }
 }

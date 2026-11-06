@@ -49,6 +49,7 @@ fun MemberScreen(
     onToggleMic: () -> Unit,
     onSendThumbsUp: () -> Unit,
     onVolume: (Float) -> Unit,
+    onRetry: () -> Unit,
     onEnd: () -> Unit,
     onSettings: () -> Unit,
 ) {
@@ -167,20 +168,36 @@ fun MemberScreen(
             }
         }
 
-        BigMicButton(
-            live = state.myMicLive,
-            enabled = FloorPresentation.canSpeak(state),
-            caption = FloorPresentation.micCaption(state),
-            modifier = Modifier.fillMaxWidth(),
-            onTap = onToggleMic,
-        )
+        if (state.link == LinkState.FAILED) {
+            SectionCard(title = "Connection lost") {
+                Text(
+                    "The director is offline. The session may have ended.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CommsColors.TextSecondary,
+                )
+                VerticalSpacer(12)
+                Button(
+                    onClick = onRetry,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                ) { Text("Try again", style = MaterialTheme.typography.labelLarge) }
+            }
+        } else {
+            BigMicButton(
+                live = state.myMicLive,
+                enabled = FloorPresentation.canSpeak(state),
+                caption = FloorPresentation.micCaption(state),
+                modifier = Modifier.fillMaxWidth(),
+                onTap = onToggleMic,
+            )
 
-        Text(
-            "Only the director hears you. Nobody else in the team is on this channel.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = CommsColors.TextSecondary,
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 12.dp),
-        )
+            Text(
+                "Only the director hears you. Nobody else in the team is on this channel.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = CommsColors.TextSecondary,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 12.dp),
+            )
+        }
 
         SectionCard(title = "Incoming volume") {
             Row(verticalAlignment = Alignment.CenterVertically) {

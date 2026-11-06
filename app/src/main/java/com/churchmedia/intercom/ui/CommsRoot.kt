@@ -140,6 +140,7 @@ fun CommsRoot(controller: SessionController) {
                 onToggleMic = controller::toggleMemberMic,
                 onSendThumbsUp = controller::sendThumbsUp,
                 onVolume = controller::setVolume,
+                onRetry = controller::retryMemberConnection,
                 onEnd = {
                     showSettings = false
                     controller.endSession()

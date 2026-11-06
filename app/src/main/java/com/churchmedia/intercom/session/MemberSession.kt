@@ -67,7 +67,15 @@ class MemberSession(
         runCatching { client.send(ClientMessage.Bye) }
         runCatching { client.close() }
         runCatching { engine.close() }
-        runCatching { audioRoute.exitCommunicationMode() }
+    }
+
+    /**
+     * Reconnect after the director was unreachable. Keeps the participant in the
+     * session rather than dropping them back to the Home screen.
+     */
+    fun retry() {
+        engine.reset()
+        client.connect(url, ClientMessage.Hello(code = code, displayName = displayName))
     }
 
     /** Tap the mic: take the floor if it is free, otherwise give it back. */

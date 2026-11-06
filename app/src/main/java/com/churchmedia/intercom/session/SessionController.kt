@@ -268,10 +268,17 @@ class SessionController(
     // --------------------------------------------------------------- controls
 
     fun endSession(reason: String? = null) {
-        runCatching { director?.stop(reason ?: "Session ended") }
-        runCatching { member?.stop() }
+        val directorSession = director
+        val memberSession = member
         director = null
         member = null
+
+        runCatching { memberSession?.stop() }
+        // The director's stop waits on the signalling server's grace period, so it runs
+        // off the main thread to keep the UI responsive.
+        if (directorSession != null) {
+            scope.launch { runCatching { directorSession.stop(reason ?: "Session ended") } }
+        }
         runCatching { audioRoute.exitCommunicationMode() }
         runCatching { lanBinder.unbind() }
         SessionService.stop(context)
@@ -307,6 +314,11 @@ class SessionController(
     /** Participant sends a thumbs-up to the director. */
     fun sendThumbsUp() {
         member?.sendThumbsUp()
+    }
+
+    /** Participant retries after the director was unreachable; keeps them in the session. */
+    fun retryMemberConnection() {
+        member?.retry()
     }
 
     fun setRecipients(ids: Set<String>) {
