@@ -83,13 +83,17 @@ fun MemberScreen(
 
         VerticalSpacer(16)
 
-        val banner = when {
-            state.myMicLive -> "You are live — the director hears you" to Tone.Live
-            state.floor is FloorState.Director -> "$hostName is talking" to Tone.Accent
-            state.floor is FloorState.Member -> "Another member is replying" to Tone.Warning
-            else -> "The channel is quiet" to Tone.Neutral
-        }
+        val banner = FloorPresentation.banner(state)
         FloorBanner(banner.first, banner.second)
+
+        if (!FloorPresentation.canSpeak(state) && connected) {
+            VerticalSpacer(6)
+            Text(
+                "You can speak when the microphone becomes available.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = CommsColors.TextSecondary,
+            )
+        }
 
         if (connected || state.micLevel > 0f) {
             VerticalSpacer(12)
@@ -114,13 +118,8 @@ fun MemberScreen(
 
         BigMicButton(
             live = state.myMicLive,
-            enabled = connected,
-            caption = when {
-                state.myMicLive -> "Tap to stop"
-                !connected -> "Waiting for the director"
-                state.floor is FloorState.Director -> "Tap to ask for the floor"
-                else -> "Tap to reply privately"
-            },
+            enabled = FloorPresentation.canSpeak(state),
+            caption = FloorPresentation.micCaption(state),
             modifier = Modifier.fillMaxWidth(),
             onTap = onToggleMic,
         )
