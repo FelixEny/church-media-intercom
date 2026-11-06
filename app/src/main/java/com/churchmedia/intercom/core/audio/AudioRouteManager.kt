@@ -218,7 +218,8 @@ class AudioRouteManager(context: Context) {
             OutputDevice.Kind.EARPIECE -> "earpiece"
             OutputDevice.Kind.WIRED -> "wired"
             OutputDevice.Kind.USB -> "USB"
-            OutputDevice.Kind.BLUETOOTH -> "Bluetooth"
+            OutputDevice.Kind.BLUETOOTH -> "Bluetooth headset"
+            OutputDevice.Kind.BLUETOOTH_A2DP -> "Bluetooth (output only)"
             OutputDevice.Kind.OTHER -> "audio"
         }
         val product = runCatching { info.productName?.toString() }.getOrNull()
@@ -239,9 +240,10 @@ class AudioRouteManager(context: Context) {
         AudioDeviceInfo.TYPE_USB_DEVICE,
         AudioDeviceInfo.TYPE_USB_ACCESSORY,
         -> OutputDevice.Kind.USB
-        AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
-        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-        -> OutputDevice.Kind.BLUETOOTH
+        // SCO carries the mic and is the duplex voice path; A2DP is output-only, so it
+        // must never be auto-selected for an intercom (see AudioRoutingPolicy).
+        AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> OutputDevice.Kind.BLUETOOTH
+        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> OutputDevice.Kind.BLUETOOTH_A2DP
         else -> null
     }
 }
@@ -249,8 +251,14 @@ class AudioRouteManager(context: Context) {
 /**
  * Pure routing policy. Tested independently of Android.
  *
- * Priority: wired > USB > Bluetooth > speaker. A user override wins while the
- * preferred device is still connected; otherwise we fall back to the priority order.
+ * Priority: wired > USB > Bluetooth SCO > speaker.
+ *
+ * `BLUETOOTH_A2DP` is deliberately excluded from the automatic choice: A2DP is
+ * output-only (no microphone) and is often connected while not being worn, which
+ * silently silences the session. It remains available for manual selection.
+ *
+ * A user override wins while the preferred device is still connected; otherwise we
+ * fall back to the priority order.
  */
 object AudioRoutingPolicy {
     fun bestRoute(
@@ -265,5 +273,6 @@ object AudioRoutingPolicy {
             ?: devices.firstOrNull { it.kind == OutputDevice.Kind.USB }?.id
             ?: devices.firstOrNull { it.kind == OutputDevice.Kind.BLUETOOTH }?.id
             ?: devices.firstOrNull { it.kind == OutputDevice.Kind.SPEAKER }?.id
+        // Note: BLUETOOTH_A2DP intentionally absent — output-only, manual select only.
     }
 }

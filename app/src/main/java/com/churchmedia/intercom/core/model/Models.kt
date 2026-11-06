@@ -41,7 +41,7 @@ data class OutputDevice(
     val label: String,
     val kind: Kind,
 ) {
-    enum class Kind { SPEAKER, EARPIECE, WIRED, USB, BLUETOOTH, OTHER }
+    enum class Kind { SPEAKER, EARPIECE, WIRED, USB, BLUETOOTH, BLUETOOTH_A2DP, OTHER }
 }
 
 enum class Mode { IDLE, DIRECTOR, MEMBER }

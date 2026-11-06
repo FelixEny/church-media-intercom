@@ -3,6 +3,24 @@
 Living log of what has actually been proven on hardware, as opposed to what is
 implemented. Update this file whenever a claim is verified or disproven.
 
+## 2026-11-06 — Bluetooth A2DP trap (0.1.9)
+
+Live `dumpsys audio` on the Pixel showed the member's audio playing to **A2DP
+Bluetooth earbuds** ("Baseus Bass EP10 Pro") instead of the speaker: the auto-route
+treated any Bluetooth device as a headset and preferred it over the speaker.
+
+A2DP is output-only (no microphone) and is commonly connected while not worn, so it
+must never be auto-selected: `BLUETOOTH_A2DP` is now a separate `OutputDevice.Kind`
+and is excluded from `AudioRoutingPolicy` (still manually selectable).
+
+Also fixed in this round (0.1.8): `DirectorAudioEngine.setMicLive()` updated the
+engine-level flag but not each link's `micLive`, so members who joined before the
+director went live were encoded to nothing. Verified with WebRTC stats: the member
+went from **0 bytes inbound** to **~8 KB/s at audio level 0.5–0.8**.
+
+Routing now verified on device with no headset attached:
+`Active communication device: type:speaker`.
+
 ## 2026-11-05 — two-phone session established (0.1.2)
 
 Second phone hosted (`192.168.0.231`, session 9359); Pixel 8 Pro joined as a member

@@ -78,4 +78,45 @@ class AudioRoutingPolicyTest {
         )
         assertEquals(1, AudioRoutingPolicy.bestRoute(devices, preferredId = 2, userOverride = false))
     }
+
+    @Test
+    fun `a2dp-only earbuds are never auto-selected`() {
+        val devices = listOf(device(1, OutputDevice.Kind.BLUETOOTH_A2DP), device(2, OutputDevice.Kind.SPEAKER))
+        assertEquals(2, AudioRoutingPolicy.bestRoute(devices, null, false))
+    }
+
+    @Test
+    fun `a2dp-only devices with no speaker yield no automatic route`() {
+        val devices = listOf(device(1, OutputDevice.Kind.BLUETOOTH_A2DP))
+        assertNull(AudioRoutingPolicy.bestRoute(devices, null, false))
+    }
+
+    @Test
+    fun `sco headset beats the speaker and a2dp`() {
+        val devices = listOf(
+            device(1, OutputDevice.Kind.BLUETOOTH_A2DP),
+            device(2, OutputDevice.Kind.SPEAKER),
+            device(3, OutputDevice.Kind.BLUETOOTH),
+        )
+        assertEquals(3, AudioRoutingPolicy.bestRoute(devices, null, false))
+    }
+
+    @Test
+    fun `wired still wins over a2dp and sco`() {
+        val devices = listOf(
+            device(1, OutputDevice.Kind.BLUETOOTH_A2DP),
+            device(2, OutputDevice.Kind.BLUETOOTH),
+            device(3, OutputDevice.Kind.WIRED),
+        )
+        assertEquals(3, AudioRoutingPolicy.bestRoute(devices, null, false))
+    }
+
+    @Test
+    fun `a2dp can still be chosen manually via override`() {
+        val devices = listOf(
+            device(1, OutputDevice.Kind.BLUETOOTH_A2DP),
+            device(2, OutputDevice.Kind.SPEAKER),
+        )
+        assertEquals(1, AudioRoutingPolicy.bestRoute(devices, preferredId = 1, userOverride = true))
+    }
 }
