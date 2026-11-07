@@ -1,5 +1,6 @@
 package com.churchmedia.intercom.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -24,23 +25,32 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MicOff
+import androidx.compose.material.icons.rounded.ThumbUp
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.churchmedia.intercom.ui.theme.CommsColors
+import kotlinx.coroutines.delay
 
 enum class Tone { Neutral, Accent, Live, Warning, Danger }
 
@@ -183,6 +193,59 @@ fun BigMicButton(
             style = MaterialTheme.typography.titleMedium,
             color = if (live) CommsColors.Live else CommsColors.TextPrimary,
             textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/**
+ * Thumbs-up button that acknowledges the tap locally, so the sender knows the
+ * reaction left the phone. There is no delivery ACK in the protocol; this confirms
+ * "sent", not "seen".
+ */
+@Composable
+fun ThumbsUpButton(
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    tint: Color = CommsColors.TextSecondary,
+    onSend: () -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    var sendCount by remember { mutableIntStateOf(0) }
+    val sent = sendCount > 0
+
+    LaunchedEffect(sendCount) {
+        if (sendCount > 0) {
+            delay(1_500)
+            sendCount = 0
+        }
+    }
+
+    val background by animateColorAsState(
+        targetValue = if (sent) CommsColors.AccentDeep else Color.Transparent,
+        label = "thumbs-up-background",
+    )
+    val iconTint by animateColorAsState(
+        targetValue = if (sent) CommsColors.Accent else tint,
+        label = "thumbs-up-tint",
+    )
+
+    IconButton(
+        onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            // Bump the counter (not a boolean) so a second tap restarts the window.
+            sendCount++
+            onSend()
+        },
+        enabled = enabled,
+        modifier = modifier
+            .clip(CircleShape)
+            .background(background),
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.ThumbUp,
+            contentDescription = if (sent) "Thumbs-up sent" else contentDescription,
+            tint = iconTint,
         )
     }
 }

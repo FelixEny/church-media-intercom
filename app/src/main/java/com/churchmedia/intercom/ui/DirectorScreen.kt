@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.ThumbUp
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -25,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +37,7 @@ import com.churchmedia.intercom.ui.components.BigMicButton
 import com.churchmedia.intercom.ui.components.FloorBanner
 import com.churchmedia.intercom.ui.components.LevelMeter
 import com.churchmedia.intercom.ui.components.StatusPill
+import com.churchmedia.intercom.ui.components.ThumbsUpButton
 import com.churchmedia.intercom.ui.components.Tone
 import com.churchmedia.intercom.ui.components.VerticalSpacer
 import com.churchmedia.intercom.ui.theme.CommsColors
@@ -159,15 +160,19 @@ fun DirectorScreen(
                 }
             } else {
                 listeners.forEach { member ->
-                    MemberSelectRow(
-                        member = member,
-                        selected = state.everyone || state.recipients.contains(member.id),
-                        hasReaction = state.reactions.any { r ->
-                            r.fromId == member.id && r.toId == "director"
-                        },
-                        onToggle = { onToggleRecipient(member.id) },
-                        onSendThumbsUp = { onSendThumbsUp(member.id) },
-                    )
+                    // Key by id so per-row "sent" state never follows a positional slot
+                    // when someone leaves or joins.
+                    key(member.id) {
+                        MemberSelectRow(
+                            member = member,
+                            selected = state.everyone || state.recipients.contains(member.id),
+                            hasReaction = state.reactions.any { r ->
+                                r.fromId == member.id && r.toId == "director"
+                            },
+                            onToggle = { onToggleRecipient(member.id) },
+                            onSendThumbsUp = { onSendThumbsUp(member.id) },
+                        )
+                    }
                 }
             }
         }
@@ -230,8 +235,9 @@ private fun MemberSelectRow(
             )
         }
         if (member.micLive) StatusPill("Live", Tone.Accent)
-        IconButton(onClick = onSendThumbsUp) {
-            Icon(Icons.Rounded.ThumbUp, contentDescription = "Send thumbs up to ${member.name}", tint = CommsColors.TextSecondary)
-        }
+        ThumbsUpButton(
+            contentDescription = "Send thumbs up to ${member.name}",
+            onSend = onSendThumbsUp,
+        )
     }
 }

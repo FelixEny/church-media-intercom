@@ -14,7 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.ThumbUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,6 +34,7 @@ import com.churchmedia.intercom.ui.components.FloorBanner
 import com.churchmedia.intercom.ui.components.LevelMeter
 import com.churchmedia.intercom.ui.components.SectionCard
 import com.churchmedia.intercom.ui.components.StatusPill
+import com.churchmedia.intercom.ui.components.ThumbsUpButton
 import com.churchmedia.intercom.ui.components.Tone
 import com.churchmedia.intercom.ui.components.VerticalSpacer
 import com.churchmedia.intercom.ui.theme.CommsColors
@@ -110,9 +110,12 @@ fun MemberScreen(
                         LinkState.IDLE -> Tone.Neutral
                     },
                 )
-                IconButton(onClick = onSendThumbsUp, enabled = connected) {
-                    Icon(Icons.Rounded.ThumbUp, contentDescription = "Send thumbs up to the director", tint = CommsColors.Accent)
-                }
+                ThumbsUpButton(
+                    contentDescription = "Send thumbs up to the director",
+                    enabled = connected,
+                    tint = CommsColors.Accent,
+                    onSend = onSendThumbsUp,
+                )
                 IconButton(onClick = onSettings) {
                     Icon(Icons.Rounded.Settings, contentDescription = "Audio settings", tint = CommsColors.TextSecondary)
                 }
